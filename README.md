@@ -1,3 +1,5 @@
+![Header](./assets/header.jpg)
+
 ## Features
 
 **Morph** is a python-centric full-stack framework for building and deploying data apps.
@@ -46,6 +48,69 @@ Understanding the concept of developing a data app in Morph will let you do a fl
 └─ sql
    └─ closing_deals.sql
 ```
+
+## Building Data Apps
+
+### A little example
+
+1. Create each files in `sql`, `python` and `pages` directories.
+
+
+SQL: Using DuckDB to read CSV file.
+
+```sql
+{{
+    config(
+        name = "example_data",
+        connection = "DUCKDB"
+    )
+}}
+
+select
+    *
+from
+    read_csv("example.csv")
+```
+
+
+Python: Using Plotly to create a chart.
+
+```python
+import plotly.express as px
+import morph
+from morph import MorphGlobalContext
+@morph.func
+@morph.load_data("example_data")
+def example_chart(context: MorphGlobalContext):
+    df = context.data["example_data"].groupby("state").sum(["population"]).reset_index()
+    fig = px.bar(df, x="state", y="population")
+    return fig
+```
+
+MDX: Define the page and connect the data.
+
+```typescript
+export const title = "Starter App"
+
+# Starter App
+
+Morph is a full-stack framework for building data apps using Python, SQL and MDX.
+
+## Data
+
+<Grid cols="2">
+  <div>
+    <DataTable loadData="example_data" height={300} />
+  </div>
+  <div>
+    <Embed loadData="example_chart" height={300} />
+  </div>
+</Grid>
+```
+
+2. Run `morph serve` to open the app!
+
+![Data App](./assets/sample-data-app.png)
 
 ## Documentation
 
