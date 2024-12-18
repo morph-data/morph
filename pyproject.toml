@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "morph-data"
-version = "0.0.1-rc.3"
-description = ""
+version = "0.0.1-rc.4"
+description = "Morph is a python-centric full-stack framework for building and deploying data apps."
 authors = ["Morph <contact@morphdb.io>"]
 packages = [
     { include = "morph", from = "core" },

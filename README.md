@@ -118,4 +118,4 @@ Visit https://docs.morph-data.io for more documentation.
 
 ## Lisence
 
-Morph is [Apache 2.0](./License.md) licensed.
+Morph is [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) licensed.
