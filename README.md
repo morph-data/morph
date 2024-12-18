@@ -117,3 +117,5 @@ Morph is a full-stack framework for building data apps using Python, SQL and MDX
 Visit https://docs.morph-data.io for more documentation.
 
 ## Lisence
+
+Morph is [Apache 2.0](./License.md) licensed.
