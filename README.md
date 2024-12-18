@@ -1,4 +1,4 @@
-![Header](./assets/header.jpg)
+![Header](https://data.morphdb.io/assets/header.jpg)
 
 ## Features
 
@@ -110,7 +110,7 @@ Morph is a full-stack framework for building data apps using Python, SQL and MDX
 
 2. Run `morph serve` to open the app!
 
-![Data App](./assets/sample-data-app.png)
+![Data App](https://data.morphdb.io/assets/sample-data-app.png)
 
 ## Documentation
 
