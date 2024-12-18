@@ -409,10 +409,10 @@
   resolved "https://registry.npmjs.org/@ungap/structured-clone/-/structured-clone-1.2.0.tgz"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@use-morph/page@^0.5.0-beta.15":
-  version "0.5.0-beta.15"
-  resolved "https://registry.npmjs.org/@use-morph/page/-/page-0.5.0-beta.15.tgz"
-  integrity sha512-WbKk9V+MjqHRJotCzC/Ao9jfJGTbO/9dMDSN51Sg5LEWJVp09QiTRSwE9zHqLQ9/y5Eu8BjZlJtkcSEcQ7/68Q==
+"@use-morph/page@^0.5.0-beta.16":
+  version "0.5.0-beta.16"
+  resolved "https://registry.npmjs.org/@use-morph/page/-/page-0.5.0-beta.16.tgz"
+  integrity sha512-oDd1+G2ji+KE0DxZwYejvY7DG7GjrW884bmPY8YENPG+OMyvp/pJoUjKX08REhUi5dqxGOqyXWCfe6GCz1Dv4Q==
   dependencies:
     react-resizable-panels "^2.1.7"
 

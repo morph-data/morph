@@ -23,7 +23,7 @@
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.15.0",
     "@typescript-eslint/parser": "^7.15.0",
-    "@use-morph/page": "^0.5.0-beta.15",
+    "@use-morph/page": "^0.5.0-beta.16",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "class-variance-authority": "^0.7.1",
     "eslint": "^8.57.0",
