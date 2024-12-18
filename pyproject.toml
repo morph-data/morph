@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "morph-lib"
-version = "0.0.1"
+name = "morph-data"
+version = "0.0.1-rc.1"
 description = ""
-authors = ["Morph <contact@morph-data.io>"]
+authors = ["Morph <contact@morphdb.io>"]
 packages = [
     { include = "morph", from = "core" },
     { include = "morph_lib", from = "core" }

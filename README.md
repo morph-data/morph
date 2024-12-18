@@ -1,83 +1,54 @@
-# Morph
+## Features
 
-## How to Contribute
+**Morph** is a python-centric full-stack framework for building and deploying data apps.
 
-### Setting up the development environment
+- **Fast to start** 🚀 - Allows you to get up and running with just three commands.
+- **Deploy and operate 🌐** - Easily deploy your data apps and manage them in production. Managed cloud is available for user authentication and secure data connection.
+- **No HTML/CSS knowledge required🔰** - With **Markdown-based syntax** and **pre-made components**, you can create flexible, visually appealing designs without writing a single line of HTML or CSS.
+- **Customizable 🛠️** - **Chain Python and SQL** for advanced data workflows. Custom CSS and custom React components are available for building tailored UI.
 
-This project uses [pre-commit](https://pre-commit.com/) to enforce code quality and consistency. To install the pre-commit hooks, run the following command:
+## Quick start
 
-```shell
-pre-commit install
+1. Install morph
+
+```bash
+pip install morph-data
 ```
 
-### Run poetry install
+1. Create a new project
 
-```shell
-poetry cache clear --all pypi
-
-poetry update
-
-poetry install --all-extras
+```bash
+morph new
 ```
 
-### Contributing code
+3. Start dev server
 
-You can install your CLI tool locally to test it:
-
-```shell
-pip install --editable ‘.[morph-project]’
+```bash
+morph serve
 ```
 
-This command installs the package in editable mode, which means changes to the source files will immediately affect the installed package without needing a reinstallation.
+4. Visit `http://localhsot:9002` on browser.
 
-## How to Publish
+## How it works
 
-This project uses [poetry](https://python-poetry.org/) to manage dependencies and packaging. To publish a new version of the package, run the following command:
+Understanding the concept of developing a data app in Morph will let you do a flying start.
 
-First, update the version in `pyproject.toml` file.
+1. Develop the data processing in Python and give it an alias.
+2. Create an .mdx file. Each .mdx file becomes a page of your app.
+3. Place the component in the MDX file and specify the alias to connect to.
 
-```shell
-poetry version patch
-git commit -am "Bump version"
-git push origin main
+```
+.
+├─ pages
+│  └─ index.mdx
+├─ python
+│  └─ closing_deals_vis.py
+└─ sql
+   └─ closing_deals.sql
 ```
 
-If you want to update the version of morph-lib, you can do it by editing the template file:
+## Documentation
 
-```shell
-vim core/morph/task/template/pyproject.toml
-git commit -am "Update template file"
-git push origin main
-```
+Visit https://docs.morph-data.io for more documentation.
 
-Publish the package:
-
-```shell
-poetry publish --build
-```
-
-## How to Install the package
-
-First, create a virtual environment and activate it:
-
-```shell
-python -m venv venv
-source venv/bin/activate
-```
-
-Install the dependencies:
-
-```shell
-pip install morph-lib
-pip install 'morph-lib[morph-project]'
-```
-
-Import the package:
-
-```shell
-❯ python
-Python 3.11.8 (main, Jun 11 2024, 14:34:56) [Clang 15.0.0 (clang-1500.3.9.4)] on darwin
-Type "help", "copyright", "credits" or "license" for more information.
->>>
->>> from morph import MorphGlobalContext
-```
+## Lisence
