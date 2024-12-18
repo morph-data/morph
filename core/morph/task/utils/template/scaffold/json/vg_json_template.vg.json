@@ -1,0 +1,8 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "morph_name": "{MORPH_NAME}",
+  "data": {
+    "name": "morph::{MORPH_PARENT_NAME}"
+  },
+  "encoding": {}
+}

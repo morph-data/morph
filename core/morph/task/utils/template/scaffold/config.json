@@ -1,0 +1,74 @@
+{
+   "templates":[
+      {
+         "title":"Starter Template for MDX",
+         "description":"A simple template to get you started.",
+         "file":"./mdx/mdx_starter_template.mdx"
+      },
+      {
+         "title":"Starter Template for Python",
+         "description":"A simple template to get you started.",
+         "file":"./python/python_starter_template.py"
+      },
+      {
+         "title":"Transform SQL and Python result",
+         "description":"Transform SQL and Python result to a pandas dataframe.",
+         "file":"./python/load_data_from_result.py"
+      },
+      {
+         "title":"Execute SQL",
+         "description":"Execute SQL and return the result as a pandas dataframe.",
+         "file":"./python/execute_sql.py"
+      },
+      {
+         "title":"Visualization Template (Plotly)",
+         "description":"Create a chart template using plotly.",
+         "file":"./python/visualization_plotly.py"
+      },
+      {
+         "title":"Visualization Template (Matplotlib)",
+         "description":"Create a chart template using matplotlib.",
+         "file":"./python/visualization_matplotlib.py"
+      },
+      {
+         "title":"API JSON Template",
+         "description":"Return and store output in json format.",
+         "file":"./python/api.py"
+      },
+      {
+         "title":"Starter Template for SQL",
+         "description":"A simple template to get you started.",
+         "file":"./sql/sql_starter_template.sql"
+      },
+      {
+         "title":"Empty Template for SQL",
+         "description":"A empty template to get you started.",
+         "file":"./sql/sql_empty_template.sql"
+      },
+      {
+         "title":"Query Table",
+         "description":"Query a table.",
+         "file":"./sql/query_table.sql"
+      },
+      {
+         "title":"Count Records",
+         "description":"Count the number of records in a table.",
+         "file":"./sql/count_records.sql"
+      },
+      {
+         "title":"Calculate Sum of Field",
+         "description":"Calculate the sum of a field in a table.",
+         "file":"./sql/calc_sum_field_name.sql"
+      },
+      {
+         "title":"Calculate Sum of Field More Than 100",
+         "description":"Calculate the sum of a field in a table where the sum is more than 100.",
+         "file":"./sql/calc_sum_more_than_100.sql"
+      },
+      {
+         "title":"Count Records by Field Name",
+         "description":"Count the number of records in a table by a field name.",
+         "file":"./sql/count_records_by_field_name.sql"
+      }
+   ]
+}

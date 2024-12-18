@@ -1,0 +1,115 @@
+[tool.poetry]
+name = "morph-lib"
+version = "0.0.1"
+description = ""
+authors = ["Morph <contact@morph-data.io>"]
+packages = [
+    { include = "morph", from = "core" },
+    { include = "morph_lib", from = "core" }
+]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+click = "^8.1.7"
+toml = "^0.10.2"
+pandas = { version = "2.1.3", optional = true }
+requests = { version = "2.31.0", optional = true }
+xlrd = { version = "2.0.1", optional = true }
+matplotlib = { version = "3.5.2", optional = true }
+boto3 = { version = "^1.26.80", optional = true }
+pypika = { version = "^0.48.9", optional = true }
+pydantic = { version = "^2.5.3", optional = true }
+sqlparse = { version = "^0.4.4", optional = true }
+line-profiler = { version = "^4.1.2", optional = true }
+urllib3 = { version = "1.26.18", optional = true }
+plotly = { version = "^5.18.0", optional = true }
+kaleido = { version = "0.2.1", optional = true }
+openpyxl = { version = "^3.1.2", optional = true }
+seaborn = { version = "^0.13.2", optional = true }
+aws-lambda-powertools = { version = "^2.34.2", optional = true }
+simplejson = { version = "^3.19.2", optional = true }
+pyppeteer = { version = "^2.0.0", optional = true }
+pyyaml = "^6.0.1"
+python-dotenv = "^1.0.1"
+colorlog = "^6.8.2"
+sqlalchemy = "2.0.36"
+sshtunnel = "^0.4.0"
+asyncpg = "^0.29.0"
+greenlet = "^3.0.3"
+cryptography = "^42.0.8"
+pyjwt = "^2.8.0"
+snowflake-connector-python = "^3.11.0"
+aiomysql = "^0.2.0"
+paramiko = "^3.4.0"
+psycopg2-binary = "2.9.9"
+google = "^3.0.0"
+gspread = "^6.1.2"
+google-api-python-client = "^2.139.0"
+pypdf2 = "^3.0.1"
+google-cloud-bigquery = "^3.25.0"
+duckdb = "^1.0.0"
+Jinja2 = "^3.1.4"
+pyarrow = "^17.0.0"
+sqlglot = "^25.22.0"
+colorama = "^0.4.6"
+gitpython = "^3.1.43"
+openai = "^1.14.2"
+fastapi = "^0.115.4"
+uvicorn = "^0.32.0"
+typing-extensions = "^4.12.2"
+gitignore-parser = "^0.1.11"
+python-multipart = "^0.0.17"
+psutil = "^6.1.0"
+anthropic = "^0.39.0"
+groq = "^0.12.0"
+fastapi-inertia = "^1.0.3"
+itsdangerous = "^2.2.0"
+starlette = "^0.41.3"
+sqlalchemy-pytds = "^1.0.2"
+tabulate = "^0.9.0"
+responses = "^0.25.3"
+
+[tool.poetry.extras]
+morph-project = [
+    "pandas",
+    "requests",
+    "xlrd",
+    "matplotlib",
+    "boto3",
+    "pypika",
+    "pydantic",
+    "sqlparse",
+    "line-profiler",
+    "urllib3",
+    "plotly",
+    "kaleido",
+    "openpyxl",
+    "seaborn",
+    "aws-lambda-powertools",
+    "simplejson",
+    "pyppeteer",
+]
+
+[tool.mypy]
+exclude = ["^.*\b(example)\b.*$"]
+
+[tool.poetry.group.dev.dependencies]
+types-requests = "^2.28.11.13"
+pytest = "^7.4.4"
+flake8 = "^5.0.4"
+mypy = "^1.8.0"
+pre-commit = "^3.6.0"
+types-pytz = "^2023.3.1.1"
+pytest-asyncio = "^0.23.3"
+pydantic = {extras = ["mypy"], version = "^2.8.2"}
+pandas-stubs = "^2.2.2.240603"
+types-pyyaml = "^6.0.12.20240311"
+types-paramiko = "^3.4.0.20240423"
+
+[tool.poetry.scripts]
+morph = "morph.cli.main:cli"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

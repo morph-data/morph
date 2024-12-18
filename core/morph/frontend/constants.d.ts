@@ -1,0 +1,1 @@
+export declare const PAGES_GLOB_BASE_DIR_PATH_FROM_FRONTEND_ROOT: string;
