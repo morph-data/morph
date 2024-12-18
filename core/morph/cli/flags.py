@@ -11,6 +11,7 @@ import requests
 from click import Context, Parameter, get_current_context
 from click.core import Command as ClickCommand
 from click.core import Group, ParameterSource
+from packaging.version import InvalidVersion, Version
 
 from morph.api.cloud.utils import is_cloud
 from morph.cli.types import Command as CliCommand
@@ -409,18 +410,44 @@ def get_latest_version() -> Optional[str]:
 def check_version_warning():
     """Check if the current version is outdated and display a warning if necessary."""
     try:
-        current_version = importlib.metadata.version("morph-data")
-        latest_version = get_latest_version()
-        if latest_version and current_version != latest_version:
-            click.echo()
+        # Get the current version of morph-data
+        current_version_str = importlib.metadata.version("morph-data")
+        try:
+            current_version = Version(current_version_str)
+        except InvalidVersion:
             click.echo(
                 click.style(
-                    f"You are using morph-data version {current_version}; however, version {latest_version} is available.\n"
-                    "You should consider upgrading via the 'pip install --upgrade morph-data' command.",
+                    f"Warning: Current version {current_version_str} is not a valid semantic version.",
                     fg="yellow",
                 )
             )
-            click.echo()
+            return
+
+        # Get the latest version of morph-data from PyPI
+        latest_version_str = get_latest_version()
+        if latest_version_str:
+            try:
+                latest_version = Version(latest_version_str)
+            except InvalidVersion:
+                click.echo(
+                    click.style(
+                        f"Warning: Latest version {latest_version_str} is not a valid semantic version.",
+                        fg="yellow",
+                    )
+                )
+                return
+
+            # Compare versions
+            if current_version < latest_version:
+                click.echo()
+                click.echo(
+                    click.style(
+                        f"You are using morph-data version {current_version}; however, version {latest_version} is available.\n"
+                        "You should consider upgrading via the 'pip install --upgrade morph-data' command.",
+                        fg="yellow",
+                    )
+                )
+                click.echo()
     except importlib.metadata.PackageNotFoundError:
         click.echo(click.style("Warning: morph-data is not installed.", fg="red"))
     except Exception as e:
