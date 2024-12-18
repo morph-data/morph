@@ -35,23 +35,23 @@ classifiers=[
 python = "^3.9"
 click = "^8.1.7"
 toml = "^0.10.2"
-pandas = { version = "2.1.3", optional = true }
-requests = { version = "2.31.0", optional = true }
-xlrd = { version = "2.0.1", optional = true }
-matplotlib = { version = "3.5.2", optional = true }
-boto3 = { version = "^1.26.80", optional = true }
-pypika = { version = "^0.48.9", optional = true }
-pydantic = { version = "^2.5.3", optional = true }
-sqlparse = { version = "^0.4.4", optional = true }
-line-profiler = { version = "^4.1.2", optional = true }
-urllib3 = { version = "1.26.18", optional = true }
-plotly = { version = "^5.18.0", optional = true }
-kaleido = { version = "0.2.1", optional = true }
-openpyxl = { version = "^3.1.2", optional = true }
-seaborn = { version = "^0.13.2", optional = true }
-aws-lambda-powertools = { version = "^2.34.2", optional = true }
-simplejson = { version = "^3.19.2", optional = true }
-pyppeteer = { version = "^2.0.0", optional = true }
+pandas = "2.1.3"
+requests = "2.31.0"
+xlrd = "2.0.1"
+matplotlib = "3.5.2"
+boto3 = "^1.26.80"
+pypika = "^0.48.9"
+pydantic = "^2.5.3"
+sqlparse = "^0.4.4"
+line-profiler = "^4.1.2"
+urllib3 = "1.26.18"
+plotly = "^5.18.0"
+kaleido = "0.2.1"
+openpyxl = "^3.1.2"
+seaborn = "^0.13.2"
+aws-lambda-powertools = "^2.34.2"
+simplejson = "^3.19.2"
+pyppeteer = "^2.0.0"
 pyyaml = "^6.0.1"
 python-dotenv = "^1.0.1"
 colorlog = "^6.8.2"
@@ -91,27 +91,6 @@ starlette = "^0.41.3"
 sqlalchemy-pytds = "^1.0.2"
 tabulate = "^0.9.0"
 responses = "^0.25.3"
-
-[tool.poetry.extras]
-morph-project = [
-    "pandas",
-    "requests",
-    "xlrd",
-    "matplotlib",
-    "boto3",
-    "pypika",
-    "pydantic",
-    "sqlparse",
-    "line-profiler",
-    "urllib3",
-    "plotly",
-    "kaleido",
-    "openpyxl",
-    "seaborn",
-    "aws-lambda-powertools",
-    "simplejson",
-    "pyppeteer",
-]
 
 [tool.mypy]
 exclude = ["^.*\b(example)\b.*$"]
