@@ -53,7 +53,7 @@ def cli(ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]) -> None:
 def version() -> None:
     """Show the current morph-lib CLI version."""
     try:
-        current_version = importlib.metadata.version("morph-lib")
+        current_version = importlib.metadata.version("morph-data")
         click.echo(f"morph-lib CLI version: {current_version}")
     except importlib.metadata.PackageNotFoundError:
         click.echo(click.style("Error: morph-lib is not installed.", fg="red"))

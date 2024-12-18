@@ -409,7 +409,7 @@ def get_latest_version() -> Optional[str]:
 def check_version_warning():
     """Check if the current version is outdated and display a warning if necessary."""
     try:
-        current_version = importlib.metadata.version("morph-lib")
+        current_version = importlib.metadata.version("morph-data")
         latest_version = get_latest_version()
         if latest_version and current_version != latest_version:
             click.echo()
