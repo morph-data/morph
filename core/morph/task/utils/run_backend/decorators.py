@@ -44,8 +44,11 @@ def func(
         Literal["dataframe", "csv", "visualization", "markdown", "json"]
     ] = None,
     result_cache_ttl: Optional[int] = None,
+    alias: str | None = None,
     **kwargs: dict[str, Any],
 ) -> Callable[[Callable[Param, RetType]], Callable[Param, RetType]]:
+    name = alias or name
+
     context = MorphGlobalContext.get_instance()
     project = load_project(find_project_root_dir())
 

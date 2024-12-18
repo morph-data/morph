@@ -138,6 +138,8 @@ def _import_sql_file(
                 kwargs = config["kwargs"]
                 if "name" in kwargs:
                     name = kwargs["name"]
+                if "alias" in kwargs:
+                    name = kwargs["alias"]
                 if "description" in kwargs:
                     description = kwargs["description"]
                 if "output_paths" in kwargs:
