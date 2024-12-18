@@ -386,12 +386,12 @@ def format_params(params: List[Parameter]) -> ArgsList:
 
 
 def get_latest_version() -> Optional[str]:
-    """Retrieve the latest morph-lib version from PyPI."""
+    """Retrieve the latest morph-data version from PyPI."""
     if is_cloud():
         return None
 
     try:
-        response = requests.get("https://pypi.org/pypi/morph-lib/json", timeout=5)
+        response = requests.get("https://pypi.org/pypi/morph-data/json", timeout=5)
         if response.status_code == 200:
             json_data: Any = response.json()
             info = json_data.get("info", {})
@@ -415,13 +415,13 @@ def check_version_warning():
             click.echo()
             click.echo(
                 click.style(
-                    f"You are using morph-lib version {current_version}; however, version {latest_version} is available.\n"
-                    "You should consider upgrading via the 'pip install --upgrade morph-lib' command.",
+                    f"You are using morph-data version {current_version}; however, version {latest_version} is available.\n"
+                    "You should consider upgrading via the 'pip install --upgrade morph-data' command.",
                     fg="yellow",
                 )
             )
             click.echo()
     except importlib.metadata.PackageNotFoundError:
-        click.echo(click.style("Warning: morph-lib is not installed.", fg="red"))
+        click.echo(click.style("Warning: morph-data is not installed.", fg="red"))
     except Exception as e:
         click.echo(click.style(f"Warning: Failed to check version: {e}", fg="yellow"))
