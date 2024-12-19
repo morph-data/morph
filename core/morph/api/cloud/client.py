@@ -44,7 +44,7 @@ class MorphApiTokenClientImpl(MorphApiBaseClient):
 class MorphApiKeyClientImpl(MorphApiBaseClient):
     def __init__(self):
         self.workspace_id = os.environ.get("MORPH_WORKSPACE_ID", "")
-        self.api_url = os.environ.get("MORPH_BASE_URL", "")
+        self.api_url = os.environ.get("MORPH_BASE_URL", MORPH_API_BASE_URL)
         self.api_key = os.environ.get("MORPH_API_KEY", "")
         if self.workspace_id == "" or self.api_url == "" or self.api_key == "":
             config_path = MorphConstant.MORPH_CRED_PATH
