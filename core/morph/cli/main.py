@@ -268,3 +268,24 @@ def init(
     task = InitTask(ctx.obj["flags"])
     results = task.run()
     return results, True
+
+
+@cli.command("build-frontend")
+@params.port
+@params.host
+@params.workdir
+@params.no_log
+@click.pass_context
+@global_flags
+@requires.preflight
+@requires.postflight
+def build_frontend(
+    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
+) -> Tuple[None, bool]:
+    """Build frontend with server."""
+    from morph.task.build import BuildTask
+
+    task = BuildTask(ctx.obj["flags"])
+    task.run()
+
+    return None, True
