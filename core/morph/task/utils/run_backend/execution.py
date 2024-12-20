@@ -196,13 +196,12 @@ def run_cell(
                 raise RequestError(f"Variable '{var_name}' is required.")
 
     # get cached result if exists
-    if (
-        project
-        and (meta_obj.result_cache_ttl or project.result_cache_ttl)
-        and cached_cell
-        and is_cache_valid
-    ):
-        cache_ttl = meta_obj.result_cache_ttl or project.result_cache_ttl or 0
+    cache_ttl = (
+        meta_obj.result_cache_ttl
+        or (project.result_cache_ttl if project else None)
+        or 0
+    )
+    if project and cache_ttl > 0 and cached_cell and is_cache_valid:
         if len(vars.items()) == 0:
             cache, _ = db_manager.get_run_records(
                 None,
