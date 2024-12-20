@@ -2,13 +2,11 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
 from typing import Optional
 
 import click
 import git
-from morph_lib.database import execute_sql
 
 from morph import MorphGlobalContext
 from morph.api.cloud.utils import is_cloud
@@ -240,71 +238,6 @@ def file_upload(context: MorphGlobalContext) -> str:
             context = MorphGlobalContext.get_instance()
             context.load(self.project_root)
             context.dump()
-
-            # Check database connection
-            click.echo("Checking database connection...")
-            max_retries = 60
-            for i in range(max_retries):
-                try:
-                    execute_sql("SELECT 1")
-                    click.echo(
-                        click.style("Database connection successful!", fg="green")
-                    )
-                    break
-                except Exception:
-                    if i == max_retries - 1:
-                        click.echo(click.style("Database connection failed.", fg="red"))
-                        click.echo(
-                            click.style(
-                                "Failed to connect to the database. Please make sure you have already run 'morph init' command.",
-                                fg="red",
-                                bg="yellow",
-                            )
-                        )
-                        sys.exit(1)  # 1: General errors
-                    else:
-                        time.sleep(0.1)
-
-            # Execute SQL scripts in the init/sql directory
-            sql_directory = Path(self.project_root).joinpath("init/sql")
-            if sql_directory.exists():
-                sql_files = sorted(
-                    sql_directory.glob("*.sql"),
-                    key=lambda x: (
-                        x.name.split("_")[0].isdigit(),
-                        (
-                            int(x.name.split("_")[0])
-                            if x.name.split("_")[0].isdigit()
-                            else float("inf")
-                        ),
-                    ),
-                )
-                if len(sql_files) > 0:
-                    click.echo("Executing SQL init scripts...")
-                    for sql_file in sql_files:
-                        with open(sql_file, "r") as file:
-                            sql_script = file.read()
-                        try:
-                            execute_sql(sql_script)
-                            click.echo(
-                                click.style(
-                                    f"{sql_file.name} executed successfully!",
-                                    fg="green",
-                                )
-                            )
-                        except Exception as e:
-                            click.echo(
-                                click.style(f"{sql_file.name} failed.", fg="red")
-                            )
-                            raise e
-
-                # Remove the init directory, right after executing the SQL scripts
-                init_directory = sql_directory.parent
-                subprocess.run(
-                    f"rm -fr {init_directory.as_posix()}",
-                    shell=True,
-                    check=True,
-                )
 
             os.chdir(original_working_dir)
 

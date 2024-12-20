@@ -39,7 +39,7 @@ class ApiTask(BaseTask):
         if not is_cloud() and self.args.BUILD:
             click.echo(
                 click.style(
-                    "Error: Build flag is only available on cloud.",
+                    "Error: Build flag is only available on cloud, use 'morph build-frontend' instead.",
                     fg="red",
                     bg="yellow",
                 )
