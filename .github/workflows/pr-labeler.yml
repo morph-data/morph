@@ -1,0 +1,28 @@
+name: PR Labeler
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+jobs:
+  label-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract branch name
+        id: extract_branch
+        run: echo "branch_name=${{ github.head_ref }}" >> $GITHUB_ENV
+
+      - name: Add labels based on branch name
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          labels: |
+            ${{ startsWith(env.branch_name, 'feature/') && 'feature' || '' }}
+            ${{ startsWith(env.branch_name, 'fix/') && 'bug' || '' }}
+            ${{ startsWith(env.branch_name, 'enhancement/') && 'enhancement' || '' }}
+            ${{ startsWith(env.branch_name, 'optimization/') && 'optimization' || '' }}
+            ${{ startsWith(env.branch_name, 'refactor/') && 'refactor' || '' }}
+            ${{ startsWith(env.branch_name, 'chore/') && 'chore' || '' }}
