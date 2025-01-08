@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import functools
-import importlib.metadata
 from typing import Callable, Dict, Optional, Tuple, Union
 
 import click
@@ -41,22 +40,17 @@ def global_flags(
     no_args_is_help=True,
     epilog="Specify one of these sub-commands and you can find more help from there.",
 )
+@click.version_option(
+    package_name="morph-data",
+    prog_name="morph",
+    message="morph-data CLI version: %(version)s",
+)
 @click.pass_context
 @global_flags
 def cli(ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]) -> None:
-    """An data analysis tool for transformations, visualization by using SQL and Python.
+    """A data analysis tool for transformations, visualization by using SQL and Python.
     For more information on these commands, visit: docs.morph-data.io
     """
-
-
-@cli.command("version")
-def version() -> None:
-    """Show the current morph-data CLI version."""
-    try:
-        current_version = importlib.metadata.version("morph-data")
-        click.echo(f"morph-data CLI version: {current_version}")
-    except importlib.metadata.PackageNotFoundError:
-        click.echo(click.style("Error: morph-data is not installed.", fg="red"))
 
 
 @cli.command("config")
