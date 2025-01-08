@@ -6,7 +6,6 @@ import subprocess
 import sys
 import threading
 import time
-import webbrowser
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -14,8 +13,6 @@ import click
 import psutil
 from dotenv import dotenv_values, load_dotenv
 
-from morph.api.cloud.client import MorphApiClient, MorphApiKeyClientImpl
-from morph.api.cloud.types import EnvVarList
 from morph.api.cloud.utils import is_cloud
 from morph.cli.flags import Flags
 from morph.constants import MorphConstant
@@ -84,19 +81,21 @@ class ApiTask(BaseTask):
             os.environ["MORPH_TEAM_SLUG"] = self.team_slug
             os.environ["MORPH_API_KEY"] = self.api_key
 
-        if is_cloud():
-            client = MorphApiClient(MorphApiKeyClientImpl)
-            cloud_env_vars = client.req.list_env_vars().to_model(EnvVarList)
-            if cloud_env_vars:
-                for cloud_env_var in cloud_env_vars.items:
-                    os.environ[cloud_env_var.key] = cloud_env_var.value
-        else:
-            project_root = find_project_root_dir()
-            dotenv_path = os.path.join(project_root, ".env")
-            load_dotenv(dotenv_path)
-            env_vars = dotenv_values(dotenv_path)
-            for e_key, e_val in env_vars.items():
-                os.environ[e_key] = str(e_val)
+        # TODO: デプロイコマンドに入れる
+        # if is_cloud():
+        #     client = MorphApiClient(MorphApiKeyClientImpl)
+        #     cloud_env_vars = client.req.list_env_vars().to_model(EnvVarList)
+        #     if cloud_env_vars:
+        #         for cloud_env_var in cloud_env_vars.items:
+        #             os.environ[cloud_env_var.key] = cloud_env_var.value
+        # else:
+        project_root = find_project_root_dir()
+        dotenv_path = os.path.join(project_root, ".env")
+        load_dotenv(dotenv_path)
+        env_vars = dotenv_values(dotenv_path)
+        for e_key, e_val in env_vars.items():
+            os.environ[e_key] = str(e_val)
+
         desired_tz = os.getenv("TZ")
         if desired_tz is not None:
             tz_manager = TimezoneManager()
@@ -224,117 +223,113 @@ class ApiTask(BaseTask):
             self._serve()
 
     def _serve(self) -> None:
-        self._setup_frontend()
+        # self._setup_frontend()
 
         current_dir = Path(__file__).resolve().parent
         server_script_path = os.path.join(current_dir, "server.py")
 
-        if is_cloud():
-            self._start_frontend()
+        # if is_cloud():
+        #     self._start_frontend()
 
-            subprocess.Popen(
-                [
-                    sys.executable,
-                    server_script_path,
-                ]
-                + sys.argv[1:],
-                stdout=None,
-                stderr=None,
-            )
-        else:
-            signal.signal(signal.SIGINT, self._signal_handler)
-            try:
-                frontend_dir = os.path.join(
-                    Path(__file__).resolve().parents[1], "frontend"
-                )
+        #     subprocess.Popen(
+        #         [
+        #             sys.executable,
+        #             server_script_path,
+        #         ]
+        #         + sys.argv[1:],
+        #         stdout=None,
+        #         stderr=None,
+        #     )
+        # else:
+        signal.signal(signal.SIGINT, self._signal_handler)
+        try:
+            frontend_dir = os.path.join(Path(__file__).resolve().parents[1], "frontend")
 
-                self._run_process(
-                    [sys.executable, server_script_path] + sys.argv[1:],
-                    log=self.is_debug,
-                )
-
-                click.echo(
-                    click.style(
-                        "✅ Done server setup",
-                        fg="green",
-                    )
-                )
-                self._run_process(
-                    ["npm", "run", "dev"],
-                    cwd=frontend_dir,
-                    log=False,
-                )
-                running_url = f"http://localhost:{self.args.PORT}"
-                click.echo(
-                    click.style(
-                        f"\nMorph is ready!🚀\n\n ->  Local: {running_url}\n",
-                        fg="yellow",
-                    )
-                )
-                if not is_cloud():
-                    webbrowser.open(running_url)
-                signal.pause()
-            except KeyboardInterrupt:
-                self._signal_handler(None, None)
-
-    def _setup_frontend(self) -> None:
-        click.echo(
-            click.style(
-                "Starting server ...",
-                fg="green",
-            )
-        )
-        current_dir = Path(__file__).resolve()
-        frontend_dir = os.path.join(current_dir.parents[1], "frontend")
-
-        main_tsx = os.path.join(frontend_dir, "src", "main.tsx")
-        main_base_tsx = os.path.join(frontend_dir, "src", "main-base.tsx")
-        constants_file = os.path.join(frontend_dir, "constants.js")
-        constants_base_file = os.path.join(frontend_dir, "constants-base.js")
-
-        if not self.args.BUILD:
-            rel_from_main_tsx_path = os.path.relpath(
-                os.getcwd(), start=os.path.dirname(main_tsx)
-            )
-            pages_dir_path = os.path.join(rel_from_main_tsx_path, "src", "pages")
-            pages_glob_pattern = os.path.join(pages_dir_path, "**", "*.mdx")
-            pages_path = os.path.join(
-                rel_from_main_tsx_path, "src", "pages", "${name}.mdx"
+            self._run_process(
+                [sys.executable, server_script_path] + sys.argv[1:],
+                log=self.is_debug,
             )
 
-            with open(main_base_tsx, "r") as f:
-                m_content = f.read()
-                m_content = m_content.replace(
-                    "PAGES_GLOB_BASE_DIR_PATH", pages_dir_path
+            click.echo(
+                click.style(
+                    "✅ Done server setup",
+                    fg="green",
                 )
-                m_content = m_content.replace(
-                    "PAGES_GLOB_BASE_PATH", pages_glob_pattern
-                )
-                m_content = m_content.replace("PAGES_PATH", pages_path)
-            with open(main_tsx, "w", encoding="utf-8") as f:
-                f.write(m_content)
-
-        rel_from_frontend_path = os.path.relpath(os.getcwd(), frontend_dir)
-        pages_dir_from_frontend_path = os.path.join(
-            rel_from_frontend_path, "src", "pages"
-        )
-        with open(constants_base_file, "r") as f:
-            c_content = f.read()
-            c_content = c_content.replace(
-                "%PAGES_GLOB_BASE_DIR_PATH_FROM_FRONTEND_ROOT%",
-                pages_dir_from_frontend_path,
             )
-        with open(constants_file, "w", encoding="utf-8") as f:
-            f.write(c_content)
+            self._run_process(
+                ["npm", "run", "dev"],
+                cwd=frontend_dir,
+                log=False,
+            )
+            running_url = f"http://localhost:{self.args.PORT}"
+            click.echo(
+                click.style(
+                    f"\nMorph is ready!🚀\n\n ->  Local: {running_url}\n",
+                    fg="yellow",
+                )
+            )
+            signal.pause()
+        except KeyboardInterrupt:
+            self._signal_handler(None, None)
 
-        subprocess.run(
-            ["npm", "install"],
-            cwd=frontend_dir,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            check=True,
-        )
+    # def _setup_frontend(self) -> None:
+    #     click.echo(
+    #         click.style(
+    #             "Starting server ...",
+    #             fg="green",
+    #         )
+    #     )
+    #     current_dir = Path(__file__).resolve()
+    #     frontend_dir = os.path.join(current_dir.parents[1], "frontend")
+
+    #     main_tsx = os.path.join(frontend_dir, "src", "main.tsx")
+    #     main_base_tsx = os.path.join(frontend_dir, "src", "main-base.tsx")
+    #     constants_file = os.path.join(frontend_dir, "constants.js")
+    #     constants_base_file = os.path.join(frontend_dir, "constants-base.js")
+
+    #     if not self.args.BUILD:
+    #         rel_from_main_tsx_path = os.path.relpath(
+    #             os.getcwd(), start=os.path.dirname(main_tsx)
+    #         )
+    #         pages_dir_path = os.path.join(rel_from_main_tsx_path, "src", "pages")
+    #         pages_glob_pattern = os.path.join(pages_dir_path, "**", "*.mdx")
+    #         pages_path = os.path.join(
+    #             rel_from_main_tsx_path, "src", "pages", "${name}.mdx"
+    #         )
+
+    #         with open(main_base_tsx, "r") as f:
+    #             m_content = f.read()
+    #             m_content = m_content.replace(
+    #                 "PAGES_GLOB_BASE_DIR_PATH", pages_dir_path
+    #             )
+    #             m_content = m_content.replace(
+    #                 "PAGES_GLOB_BASE_PATH", pages_glob_pattern
+    #             )
+    #             m_content = m_content.replace("PAGES_PATH", pages_path)
+    #         with open(main_tsx, "w", encoding="utf-8") as f:
+    #             f.write(m_content)
+
+    #     rel_from_frontend_path = os.path.relpath(os.getcwd(), frontend_dir)
+    #     pages_dir_from_frontend_path = os.path.join(
+    #         rel_from_frontend_path, "src", "pages"
+    #     )
+    #     with open(constants_base_file, "r") as f:
+    #         c_content = f.read()
+    #         c_content = c_content.replace(
+    #             "%PAGES_GLOB_BASE_DIR_PATH_FROM_FRONTEND_ROOT%",
+    #             pages_dir_from_frontend_path,
+    #         )
+    #     with open(constants_file, "w", encoding="utf-8") as f:
+    #         f.write(c_content)
+
+    #     subprocess.run(
+    #         ["npm", "install"],
+    #         cwd=frontend_dir,
+    #         stdout=subprocess.DEVNULL,
+    #         stderr=subprocess.DEVNULL,
+    #         text=True,
+    #         check=True,
+    #     )
 
     def _start_frontend(self) -> None:
         current_dir = Path(__file__).resolve()
