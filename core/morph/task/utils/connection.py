@@ -589,6 +589,8 @@ class ConnectionYaml(BaseModel):
     def find_connection(
         profile_yaml: Optional["ConnectionYaml"], connection_slug: str
     ) -> Optional[Connection]:
+        if connection_slug == MORPH_DUCKDB_CONNECTION_SLUG:
+            return DuckDBConnection(type=CONNECTION_TYPE.duckdb)
         profile_yaml = (
             ConnectionYaml.load_yaml() if profile_yaml is None else profile_yaml
         )

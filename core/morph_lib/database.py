@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from urllib3.exceptions import InsecureRequestWarning
 
 from morph.api.cloud.client import MorphApiClient, MorphApiKeyClientImpl
+from morph.api.cloud.utils import is_cloud
 from morph.config.project import MorphProject, load_project
 from morph.task.utils.connection import (
     CONNECTION_TYPE,
@@ -20,6 +21,7 @@ from morph.task.utils.connection import (
     Connection,
     ConnectionYaml,
     DatabaseConnection,
+    DuckDBConnection,
 )
 from morph.task.utils.connections.connector import Connector
 from morph.task.utils.morph import find_project_root_dir
@@ -101,7 +103,17 @@ def __find_connection(connection: str | Connection | None) -> Connection:
 
     cloud_connection: Optional[Union[Connection, DatabaseConnection]] = None
 
-    if connection is not None and isinstance(connection, str):
+    if connection is not None and isinstance(connection, DuckDBConnection):
+        return connection
+    elif connection is not None and isinstance(connection, str):
+        if not is_cloud():
+            connection_yaml = ConnectionYaml.load_yaml()
+            cloud_connection = ConnectionYaml.find_connection(
+                connection_yaml, connection
+            )
+            if cloud_connection is None:
+                raise MorphApiError(f"Could not find {connection} in connections.yml.")
+            return cloud_connection
         cloud_connection = ConnectionYaml.find_cloud_connection(connection)
         if (
             cloud_connection.type != CONNECTION_TYPE.bigquery
