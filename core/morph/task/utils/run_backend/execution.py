@@ -18,15 +18,8 @@ from morph_lib.error import RequestError
 from morph_lib.types import HtmlImageResponse, MarkdownResponse, MorphChatStreamChunk
 from pydantic import BaseModel
 
-from morph.api.cloud.utils import is_cloud
 from morph.config.project import MorphProject
-from morph.task.utils.connection import (
-    CONNECTION_TYPE,
-    MORPH_BUILTIN_DB_CONNECTION_SLUG,
-    Connection,
-    ConnectionYaml,
-    DatabaseConnection,
-)
+from morph.task.utils.connection import Connection, ConnectionYaml, DatabaseConnection
 from morph.task.utils.connections.connector import Connector
 from morph.task.utils.logging import (
     get_morph_logger,
@@ -447,79 +440,33 @@ def _run_sql(
     cloud_connection: Optional[Union[Connection, DatabaseConnection]] = None
 
     if connection:
-        if not is_cloud():
-            connection_yaml = ConnectionYaml.load_yaml()
-            cloud_connection = ConnectionYaml.find_connection(
-                connection_yaml, connection
-            )
-            connector = Connector(
-                connection,
-                cloud_connection,
-                is_cloud=False,
-            )
-            return connector.execute_sql(sql)
-        cloud_connection = ConnectionYaml.find_cloud_connection(connection)
-        if (
-            cloud_connection.type == CONNECTION_TYPE.bigquery
-            or cloud_connection.type == CONNECTION_TYPE.snowflake
-            or cloud_connection.type == CONNECTION_TYPE.postgres
-            or cloud_connection.type == CONNECTION_TYPE.redshift
-            or cloud_connection.type == CONNECTION_TYPE.mysql
-            or cloud_connection.type == CONNECTION_TYPE.mssql
-            or cloud_connection.type == CONNECTION_TYPE.athena
-            or cloud_connection.type == CONNECTION_TYPE.duckdb
-        ):
-            connector = Connector(
-                connection,
-                cloud_connection,
-                is_cloud=True,
-            )
-            return connector.execute_sql(sql)
-        else:
-            raise ValueError(
-                f"Unsupported connection type to query: {cloud_connection.type}"
-            )
+        connection_yaml = ConnectionYaml.load_yaml()
+        cloud_connection = ConnectionYaml.find_connection(connection_yaml, connection)
+        if cloud_connection is None:
+            raise ValueError(f"Connection {connection} not found.")
+        connector = Connector(connection, cloud_connection)
     else:
-        if project and project.default_connection:
-            default_connection = project.default_connection
-            connection_yaml = ConnectionYaml.load_yaml()
-            if default_connection == MORPH_BUILTIN_DB_CONNECTION_SLUG:
-                cloud_connection = ConnectionYaml.find_connection(
-                    connection_yaml, workspace_id_or_connection_slug
-                )
-                if cloud_connection is None:
-                    db, cloud_connection = ConnectionYaml.find_builtin_db_connection()
-                    connection_yaml.add_connections({db: cloud_connection})
-                    connection_yaml.save_yaml(True)
-            else:
-                cloud_connection = ConnectionYaml.find_connection(
-                    connection_yaml, default_connection
-                )
-                if cloud_connection is None:
-                    cloud_connection = ConnectionYaml.find_cloud_connection(
-                        default_connection
-                    )
-        else:
-            connection_yaml = ConnectionYaml.load_yaml()
-            cloud_connection = ConnectionYaml.find_connection(
-                connection_yaml, workspace_id_or_connection_slug
+        if project is None:
+            raise ValueError("Could not find project.")
+        elif project.default_connection is None:
+            raise ValueError(
+                "Default connection is not set in morph_project.yml. Please set default_connection."
             )
-            if cloud_connection is None:
-                db, cloud_connection = ConnectionYaml.find_builtin_db_connection()
-                connection_yaml.add_connections({db: cloud_connection})
-                connection_yaml.save_yaml(True)
-
-        connector = Connector(
-            connection or "",
-            cloud_connection,
-            is_cloud=True,
+        default_connection = project.default_connection
+        connection_yaml = ConnectionYaml.load_yaml()
+        cloud_connection = ConnectionYaml.find_connection(
+            connection_yaml, default_connection
         )
-        if logger:
-            logger.info("Connecting to database...")
-        df = connector.execute_sql(sql)
-        if logger:
-            logger.info("Obtained results from database...")
-        return df
+        if cloud_connection is None:
+            raise ValueError(f"Connection {connection} not found.")
+        connector = Connector(default_connection, cloud_connection)
+
+    if logger:
+        logger.info("Connecting to database...")
+    df = connector.execute_sql(sql)
+    if logger:
+        logger.info("Obtained results from database...")
+    return df
 
 
 def _run_cell_with_dag(

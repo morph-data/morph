@@ -52,7 +52,7 @@ class BuildTask(BaseTask):
             ) or config.get("default", "database_id", fallback="")
             self.api_key: str = config.get("default", "api_key", fallback="")
 
-            os.environ["MORPH_WORKSPACE_ID"] = self.workspace_id
+            os.environ["MORPH_PROJECT_ID"] = self.workspace_id
             os.environ["MORPH_BASE_URL"] = self.app_url
             os.environ["MORPH_TEAM_SLUG"] = self.team_slug
             os.environ["MORPH_API_KEY"] = self.api_key

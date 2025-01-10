@@ -245,3 +245,9 @@ no_log = click.option(
     is_flag=True,
     help="Whether to disable logging.",
 )
+
+project_id = click.option(
+    "--project-id",
+    type=str,
+    help="Specify the project id.",
+)

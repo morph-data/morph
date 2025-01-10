@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, List, Optional, Union, get_args
 
 import pandas as pd
@@ -13,11 +12,9 @@ from pydantic import BaseModel, Field
 from urllib3.exceptions import InsecureRequestWarning
 
 from morph.api.cloud.client import MorphApiClient, MorphApiKeyClientImpl
-from morph.api.cloud.utils import is_cloud
 from morph.config.project import MorphProject, load_project
 from morph.task.utils.connection import (
     CONNECTION_TYPE,
-    MORPH_BUILTIN_DB_CONNECTION_SLUG,
     Connection,
     ConnectionYaml,
     DatabaseConnection,
@@ -95,82 +92,50 @@ class TableSchema(BaseModel):
 
 
 def __find_connection(connection: str | Connection | None) -> Connection:
-    workspace_id_or_connection_slug = os.getenv("MORPH_WORKSPACE_ID", "")
-    if isinstance(connection, str):
-        workspace_id_or_connection_slug = connection
     if isinstance(connection, get_args(Connection)):
         return connection  # type: ignore
 
-    cloud_connection: Optional[Union[Connection, DatabaseConnection]] = None
+    database_connection: Optional[Union[Connection, DatabaseConnection]] = None
 
+    # return connection itself if it's DuckDBConnection
     if connection is not None and isinstance(connection, DuckDBConnection):
         return connection
+    # find connection in connections.yml
     elif connection is not None and isinstance(connection, str):
-        if not is_cloud():
-            connection_yaml = ConnectionYaml.load_yaml()
-            cloud_connection = ConnectionYaml.find_connection(
-                connection_yaml, connection
-            )
-            if cloud_connection is None:
-                raise MorphApiError(f"Could not find {connection} in connections.yml.")
-            return cloud_connection
-        cloud_connection = ConnectionYaml.find_cloud_connection(connection)
-        if (
-            cloud_connection.type != CONNECTION_TYPE.bigquery
-            and cloud_connection.type != CONNECTION_TYPE.snowflake
-            and cloud_connection.type != CONNECTION_TYPE.redshift
-            and cloud_connection.type != CONNECTION_TYPE.mysql
-            and cloud_connection.type != CONNECTION_TYPE.postgres
-            and cloud_connection.type != CONNECTION_TYPE.athena
-            and cloud_connection.type != CONNECTION_TYPE.duckdb
-        ):
-            raise MorphApiError(
-                f"Connection type {cloud_connection.type} is not supported"
-            )
+        connection_yaml = ConnectionYaml.load_yaml()
+        database_connection = ConnectionYaml.find_connection(
+            connection_yaml, connection
+        )
+        if database_connection is None:
+            raise MorphApiError(f"Could not find {connection} in connections.yml.")
     else:
+        # in case of no connection provided, find default connection
         project: Optional[MorphProject] = load_project(find_project_root_dir())
-        if project and project.default_connection:
-            default_connection = project.default_connection
-            connection_yaml = ConnectionYaml.load_yaml()
-            if default_connection == MORPH_BUILTIN_DB_CONNECTION_SLUG:
-                cloud_connection = ConnectionYaml.find_connection(
-                    connection_yaml, workspace_id_or_connection_slug
-                )
-                if cloud_connection is None:
-                    db, cloud_connection = ConnectionYaml.find_builtin_db_connection()
-                    connection_yaml.add_connections({db: cloud_connection})
-                    connection_yaml.save_yaml(True)
-            else:
-                cloud_connection = ConnectionYaml.find_connection(
-                    connection_yaml, default_connection
-                )
-                if cloud_connection is None:
-                    cloud_connection = ConnectionYaml.find_cloud_connection(
-                        default_connection
-                    )
-        else:
-            connection_yaml = ConnectionYaml.load_yaml()
-            cloud_connection = ConnectionYaml.find_connection(
-                connection_yaml, workspace_id_or_connection_slug
+        if project is None:
+            raise MorphApiError("Could not find project.")
+        elif project.default_connection is None:
+            raise MorphApiError(
+                "Default connection is not set in morph_project.yml. Please set default_connection."
             )
-            if cloud_connection is None:
-                db, cloud_connection = ConnectionYaml.find_builtin_db_connection()
-                connection_yaml.add_connections({db: cloud_connection})
-                connection_yaml.save_yaml(True)
+        default_connection = project.default_connection
+        connection_yaml = ConnectionYaml.load_yaml()
+        database_connection = ConnectionYaml.find_connection(
+            connection_yaml, default_connection
+        )
+        if database_connection is None:
+            raise MorphApiError(f"Could not find {connection} in connections.yml.")
 
-    return cloud_connection
+    return database_connection
 
 
 def __execute_sql_impl(
     sql: str,
     connection: str | Connection | None = None,
 ) -> pd.DataFrame:
-    cloud_connection: Connection = __find_connection(connection)
+    database_connection: Connection = __find_connection(connection)
 
     connector = Connector(
-        connection if isinstance(connection, str) else "",
-        cloud_connection,
-        is_cloud=True,
+        connection if isinstance(connection, str) else "", database_connection
     )
     return connector.execute_sql(sql)
 
@@ -188,13 +153,13 @@ def __process_records(
             "Invalid action provided. Must be 'create', 'insert', or 'update'."
         )
 
-    cloud_connection = __find_connection(connection)
+    database_connection = __find_connection(connection)
     if (
-        cloud_connection.type != CONNECTION_TYPE.postgres
-        and cloud_connection.type != CONNECTION_TYPE.snowflake
-        and cloud_connection.type != CONNECTION_TYPE.redshift
-        and cloud_connection.type != CONNECTION_TYPE.mysql
-        and cloud_connection.type != CONNECTION_TYPE.bigquery
+        database_connection.type != CONNECTION_TYPE.postgres
+        and database_connection.type != CONNECTION_TYPE.snowflake
+        and database_connection.type != CONNECTION_TYPE.redshift
+        and database_connection.type != CONNECTION_TYPE.mysql
+        and database_connection.type != CONNECTION_TYPE.bigquery
     ):
         raise MorphApiError(
             "Only PostgreSQL, Snowflake, Redshift, BigQuery, and MySQL are supported for now."
@@ -211,27 +176,29 @@ def __process_records(
                 f"Primary keys {missing_keys} are not present in the DataFrame columns."
             )
 
-    sql_utils = SQLUtils(data, table_name, cloud_connection)
+    sql_utils = SQLUtils(data, table_name, database_connection)
 
     if action == "insert":
-        __execute_sql_impl(sql_utils.generate_insert_sql(), connection=cloud_connection)
+        __execute_sql_impl(
+            sql_utils.generate_insert_sql(), connection=database_connection
+        )
     elif action == "update":
         __execute_sql_impl(
-            sql_utils.generate_update_sql(primary_keys), connection=cloud_connection
+            sql_utils.generate_update_sql(primary_keys), connection=database_connection
         )
     elif action == "insert_or_update":
         if (
-            cloud_connection.type == CONNECTION_TYPE.redshift
-            or cloud_connection.type == CONNECTION_TYPE.bigquery
+            database_connection.type == CONNECTION_TYPE.redshift
+            or database_connection.type == CONNECTION_TYPE.bigquery
         ):
             raise MorphApiError("Redshift and BigQuery do not support UPSERT.")
         __execute_sql_impl(
             sql_utils.generate_insert_or_update_sql(primary_keys),
-            connection=cloud_connection,
+            connection=database_connection,
         )
     elif action == "delete":
         __execute_sql_impl(
-            sql_utils.generate_delete_sql(primary_keys), connection=cloud_connection
+            sql_utils.generate_delete_sql(primary_keys), connection=database_connection
         )
 
 
@@ -304,29 +271,23 @@ def delete_records(
     )
 
 
-def get_db_connector(connection_slug: Optional[str] = None) -> DBConnector:
+def get_db_connector(connection: str) -> DBConnector:
     """
     Obtain a DBConnector object for PostgreSQL, Redshift, or MySQL
     """
-    cloud_connection: Optional[Union[Connection, DatabaseConnection]] = None
+    connection_yaml = ConnectionYaml.load_yaml()
+    database_connection = ConnectionYaml.find_connection(connection_yaml, connection)
+    if database_connection is None:
+        raise MorphApiError(f"Could not find {connection} in connections.yml.")
 
-    if connection_slug and connection_slug != MORPH_BUILTIN_DB_CONNECTION_SLUG:
-        connection_yaml = ConnectionYaml.load_yaml()
-        cloud_connection = ConnectionYaml.find_connection(
-            connection_yaml, connection_slug
-        )
-        if cloud_connection is None:
-            cloud_connection = ConnectionYaml.find_cloud_connection(connection_slug)
-        if (
-            cloud_connection.type != CONNECTION_TYPE.postgres
-            and cloud_connection.type != CONNECTION_TYPE.redshift
-            and cloud_connection.type != CONNECTION_TYPE.mysql
-        ):
-            raise ValueError(f"Connection '{connection_slug}' is not supported.")
-    else:
-        _, cloud_connection = ConnectionYaml.find_builtin_db_connection()
+    if (
+        database_connection.type != CONNECTION_TYPE.postgres
+        and database_connection.type != CONNECTION_TYPE.redshift
+        and database_connection.type != CONNECTION_TYPE.mysql
+    ):
+        raise ValueError(f"Connection '{connection}' is not supported.")
 
-    return DBConnector(cloud_connection)
+    return DBConnector(database_connection)
 
 
 def get_tables(

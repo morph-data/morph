@@ -34,6 +34,7 @@ class MorphProject(BaseModel):
     )
     scheduled_jobs: Optional[Dict[str, ScheduledJob]] = Field(default=None)
     result_cache_ttl: Optional[int] = Field(default=0)
+    project_id: Optional[str] = Field(default=None)
 
     class Config:
         arbitrary_types_allowed = True

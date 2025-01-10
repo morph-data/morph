@@ -281,7 +281,7 @@ class TestTask(BaseTask):
                 connection_yaml.add_connections({db: connection})
                 connection_yaml.save_yaml(True)
 
-        connector = Connector("", connection, True)
+        connector = Connector("", connection)
         if len(not_null_columns) > 0:
             sql = self._generate_not_null_sql(
                 knowledge.spec.source.name, not_null_columns, connection

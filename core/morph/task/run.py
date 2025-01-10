@@ -10,9 +10,6 @@ import click
 import pydantic
 from dotenv import dotenv_values, load_dotenv
 
-from morph.api.cloud.client import MorphApiClient, MorphApiKeyClientImpl
-from morph.api.cloud.types import EnvVarList
-from morph.api.cloud.utils import is_cloud
 from morph.cli.flags import Flags
 from morph.config.project import (
     MorphProject,
@@ -67,15 +64,6 @@ class RunTask(BaseTask):
         # validate credentials
         config_path = MorphConstant.MORPH_CRED_PATH
         has_config = os.path.exists(config_path)
-        if is_cloud() and not has_config:
-            click.echo(
-                click.style(
-                    f"Error: No credentials found in {config_path}.",
-                    fg="red",
-                    bg="yellow",
-                )
-            )
-            sys.exit(1)  # 1: General errors
 
         if has_config:
             # read credentials
@@ -99,7 +87,7 @@ class RunTask(BaseTask):
             self.api_key: str = config.get("default", "api_key", fallback="")
 
             # env variable configuration
-            os.environ["MORPH_WORKSPACE_ID"] = self.workspace_id
+            os.environ["MORPH_PROJECT_ID"] = self.workspace_id
             os.environ["MORPH_BASE_URL"] = self.app_url
             os.environ["MORPH_TEAM_SLUG"] = self.team_slug
             os.environ["MORPH_API_KEY"] = self.api_key
@@ -218,18 +206,12 @@ class RunTask(BaseTask):
         self.logger = get_morph_logger(self.log_path)
 
         # load .env in project root and set timezone
-        if is_cloud():
-            client = MorphApiClient(MorphApiKeyClientImpl)
-            cloud_env_vars = client.req.list_env_vars().to_model(EnvVarList)
-            if cloud_env_vars:
-                for cloud_env_var in cloud_env_vars.items:
-                    os.environ[cloud_env_var.key] = cloud_env_var.value
-        else:
-            dotenv_path = os.path.join(self.project_root, ".env")
-            load_dotenv(dotenv_path)
-            env_vars = dotenv_values(dotenv_path)
-            for e_key, e_val in env_vars.items():
-                os.environ[e_key] = str(e_val)
+        dotenv_path = os.path.join(self.project_root, ".env")
+        load_dotenv(dotenv_path)
+        env_vars = dotenv_values(dotenv_path)
+        for e_key, e_val in env_vars.items():
+            os.environ[e_key] = str(e_val)
+
         desired_tz = os.getenv("TZ")
         if desired_tz is not None:
             tz_manager = TimezoneManager()

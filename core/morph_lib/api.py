@@ -36,7 +36,7 @@ def _read_configuration_from_env() -> EnvVars:
     Read configuration from environment variables
     These variables are loaded from ini file when the morph run command is executed
     """
-    workspace_id_value = os.getenv("MORPH_WORKSPACE_ID", "")
+    workspace_id_value = os.getenv("MORPH_PROJECT_ID", "")
     base_url_value = os.getenv("MORPH_BASE_URL", "")
     team_slug_value = os.getenv("MORPH_TEAM_SLUG", "")
     api_key_value = os.getenv("MORPH_API_KEY", "")
