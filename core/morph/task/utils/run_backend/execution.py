@@ -18,6 +18,7 @@ from morph_lib.error import RequestError
 from morph_lib.types import HtmlImageResponse, MarkdownResponse, MorphChatStreamChunk
 from pydantic import BaseModel
 
+from morph.api.cloud.utils import is_cloud
 from morph.config.project import MorphProject
 from morph.task.utils.connection import (
     CONNECTION_TYPE,
@@ -196,13 +197,12 @@ def run_cell(
                 raise RequestError(f"Variable '{var_name}' is required.")
 
     # get cached result if exists
-    if (
-        project
-        and (meta_obj.result_cache_ttl or project.result_cache_ttl)
-        and cached_cell
-        and is_cache_valid
-    ):
-        cache_ttl = meta_obj.result_cache_ttl or project.result_cache_ttl or 0
+    cache_ttl = (
+        meta_obj.result_cache_ttl
+        or (project.result_cache_ttl if project else None)
+        or 0
+    )
+    if project and cache_ttl > 0 and cached_cell and is_cache_valid:
         if len(vars.items()) == 0:
             cache, _ = db_manager.get_run_records(
                 None,
@@ -447,6 +447,17 @@ def _run_sql(
     cloud_connection: Optional[Union[Connection, DatabaseConnection]] = None
 
     if connection:
+        if not is_cloud():
+            connection_yaml = ConnectionYaml.load_yaml()
+            cloud_connection = ConnectionYaml.find_connection(
+                connection_yaml, connection
+            )
+            connector = Connector(
+                connection,
+                cloud_connection,
+                is_cloud=False,
+            )
+            return connector.execute_sql(sql)
         cloud_connection = ConnectionYaml.find_cloud_connection(connection)
         if (
             cloud_connection.type == CONNECTION_TYPE.bigquery

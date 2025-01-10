@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🚀 Feature Request
+    url: https://github.com/morph-data/morph/discussions/new?category=ideas
+    about: Share ideas for new features
+  - name: 📖 Morph documentation
+    url: https://docs.morph-data.io/
+    about: Learn more about how to use Morph
