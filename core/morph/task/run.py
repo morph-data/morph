@@ -19,7 +19,7 @@ from morph.config.project import (
 )
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
-from morph.task.utils.connection import MORPH_BUILTIN_DB_CONNECTION_SLUG
+from morph.task.utils.connection import MORPH_DUCKDB_CONNECTION_SLUG
 from morph.task.utils.logging import get_morph_logger
 from morph.task.utils.morph import find_project_root_dir
 from morph.task.utils.run_backend.errors import (
@@ -79,17 +79,9 @@ class RunTask(BaseTask):
                 )
                 sys.exit(1)  # 1: General errors
 
-            self.team_slug: str = config.get("default", "team_slug", fallback="")
-            self.app_url: str = config.get("default", "app_url", fallback="")
-            self.workspace_id: str = config.get(
-                "default", "workspace_id", fallback=""
-            ) or config.get("default", "database_id", fallback="")
             self.api_key: str = config.get("default", "api_key", fallback="")
 
             # env variable configuration
-            os.environ["MORPH_PROJECT_ID"] = self.workspace_id
-            os.environ["MORPH_BASE_URL"] = self.app_url
-            os.environ["MORPH_TEAM_SLUG"] = self.team_slug
             os.environ["MORPH_API_KEY"] = self.api_key
 
         try:
@@ -103,11 +95,13 @@ class RunTask(BaseTask):
         if self.project is None:
             self.project = default_initial_project()
         if self.project.default_connection is None:
-            self.project.default_connection = MORPH_BUILTIN_DB_CONNECTION_SLUG
+            self.project.default_connection = MORPH_DUCKDB_CONNECTION_SLUG
         save_project(self.project_root, self.project)
-
+        if self.project.project_id is not None:
+            os.environ["MORPH_PROJECT_ID"] = self.project.project_id
+        self.project_id = None
         if not has_config:
-            self.workspace_id = self.project.default_connection
+            self.project_id = self.project.default_connection
 
         # Initialize database
         self.db_manager = SqliteDBManager(self.project_root)
@@ -277,7 +271,7 @@ class RunTask(BaseTask):
                 output = run_cell(
                     self.project,
                     self.resource,
-                    self.workspace_id,
+                    self.project_id,
                     self.db_manager,
                     self.vars,
                     self.logger,

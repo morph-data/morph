@@ -4,7 +4,6 @@ from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, cast
 
 from morph.api.cloud.base import MorphApiBaseClient, MorphClientResponse
 from morph.api.cloud.types import EnvVarObject
-from morph.config.project import load_project
 from morph.constants import MorphConstant
 from morph.task.utils.morph import find_project_root_dir
 
@@ -16,16 +15,6 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
         self.project_id = os.environ.get("MORPH_PROJECT_ID", "")
         self.api_url = os.environ.get("MORPH_BASE_URL", MORPH_API_BASE_URL)
         self.api_key = os.environ.get("MORPH_API_KEY", "")
-
-        if self.project_id == "":
-            project = load_project(find_project_root_dir())
-            if project is None:
-                raise ValueError("No project found.")
-            elif project.project_id is None:
-                raise ValueError(
-                    "No project id found. Please fill project_id in morph_project.yml"
-                )
-            self.project_id = project.project_id
 
         if self.api_key == "":
             config_path = MorphConstant.MORPH_CRED_PATH
@@ -43,6 +32,18 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
                     raise ValueError(
                         "No api_key found in credential file. Please run 'morph config'."
                     )
+
+        if self.project_id == "":
+            from morph.config.project import load_project
+
+            project = load_project(find_project_root_dir())
+            if project is None:
+                raise ValueError("No project found.")
+            elif project.project_id is None:
+                raise ValueError(
+                    "No project id found. Please fill project_id in morph_project.yml"
+                )
+            self.project_id = project.project_id
 
     def get_headers(self) -> Dict[str, Any]:
         return {

@@ -58,7 +58,7 @@ class RunCellResult(BaseModel):
 def run_cell(
     project: Optional[MorphProject],
     cell: str | MorphFunctionMetaObject,
-    workspace_id_or_connection_slug: str,
+    workspace_id_or_connection_slug: Optional[str],
     db_manager: SqliteDBManager,
     vars: dict[str, Any] = {},
     logger: logging.Logger | None = None,
@@ -422,7 +422,7 @@ def _run_sql(
     project: Optional[MorphProject],
     resource: MorphFunctionMetaObject,
     sql: str,
-    workspace_id_or_connection_slug: str,
+    workspace_id_or_connection_slug: Optional[str],
     logger: Optional[logging.Logger],
 ) -> pd.DataFrame:
     load_data = resource.data_requirements or []
@@ -437,14 +437,16 @@ def _run_sql(
             con.register(df_name, df)
         return con.sql(sql).to_df()  # type: ignore
 
-    cloud_connection: Optional[Union[Connection, DatabaseConnection]] = None
+    database_connection: Optional[Union[Connection, DatabaseConnection]] = None
 
     if connection:
         connection_yaml = ConnectionYaml.load_yaml()
-        cloud_connection = ConnectionYaml.find_connection(connection_yaml, connection)
-        if cloud_connection is None:
-            raise ValueError(f"Connection {connection} not found.")
-        connector = Connector(connection, cloud_connection)
+        database_connection = ConnectionYaml.find_connection(
+            connection_yaml, connection
+        )
+        if database_connection is None:
+            database_connection = ConnectionYaml.find_cloud_connection(connection)
+        connector = Connector(connection, database_connection)
     else:
         if project is None:
             raise ValueError("Could not find project.")
@@ -454,12 +456,14 @@ def _run_sql(
             )
         default_connection = project.default_connection
         connection_yaml = ConnectionYaml.load_yaml()
-        cloud_connection = ConnectionYaml.find_connection(
+        database_connection = ConnectionYaml.find_connection(
             connection_yaml, default_connection
         )
-        if cloud_connection is None:
-            raise ValueError(f"Connection {connection} not found.")
-        connector = Connector(default_connection, cloud_connection)
+        if database_connection is None:
+            database_connection = ConnectionYaml.find_cloud_connection(
+                default_connection
+            )
+        connector = Connector(default_connection, database_connection)
 
     if logger:
         logger.info("Connecting to database...")
@@ -472,7 +476,7 @@ def _run_sql(
 def _run_cell_with_dag(
     project: Optional[MorphProject],
     cell: MorphFunctionMetaObject,
-    workspace_id_or_connection_slug: str,
+    workspace_id_or_connection_slug: Optional[str],
     db_manager: SqliteDBManager,
     vars: dict[str, Any] = {},
     dag: Optional[RunDagArgs] = None,

@@ -107,7 +107,7 @@ def __find_connection(connection: str | Connection | None) -> Connection:
             connection_yaml, connection
         )
         if database_connection is None:
-            raise MorphApiError(f"Could not find {connection} in connections.yml.")
+            database_connection = ConnectionYaml.find_cloud_connection(connection)
     else:
         # in case of no connection provided, find default connection
         project: Optional[MorphProject] = load_project(find_project_root_dir())
@@ -123,7 +123,9 @@ def __find_connection(connection: str | Connection | None) -> Connection:
             connection_yaml, default_connection
         )
         if database_connection is None:
-            raise MorphApiError(f"Could not find {connection} in connections.yml.")
+            database_connection = ConnectionYaml.find_cloud_connection(
+                default_connection
+            )
 
     return database_connection
 
