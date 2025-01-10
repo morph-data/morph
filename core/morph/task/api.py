@@ -19,6 +19,8 @@ from morph.task.base import BaseTask
 from morph.task.utils.morph import find_project_root_dir
 from morph.task.utils.timezone import TimezoneManager
 
+# TODO: change architecture depending on frontend changes
+
 
 class ApiTask(BaseTask):
     def __init__(self, args: Flags):
@@ -49,16 +51,7 @@ class ApiTask(BaseTask):
                 )
                 sys.exit(1)  # 1: General errors
 
-            self.team_slug: str = config.get("default", "team_slug", fallback="")
-            self.app_url: str = config.get("default", "app_url", fallback="")
-            self.workspace_id: str = config.get(
-                "default", "workspace_id", fallback=""
-            ) or config.get("default", "database_id", fallback="")
             self.api_key: str = config.get("default", "api_key", fallback="")
-
-            os.environ["MORPH_PROJECT_ID"] = self.workspace_id
-            os.environ["MORPH_BASE_URL"] = self.app_url
-            os.environ["MORPH_TEAM_SLUG"] = self.team_slug
             os.environ["MORPH_API_KEY"] = self.api_key
 
         project_root = find_project_root_dir()
@@ -232,6 +225,7 @@ class ApiTask(BaseTask):
             self._signal_handler(None, None)
 
     def _setup_frontend(self) -> None:
+        # TODO: remove these codes
         click.echo(
             click.style(
                 "Starting server ...",

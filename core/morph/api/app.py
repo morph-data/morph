@@ -22,6 +22,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from morph.api.error import ApiBaseError, InternalError
 from morph.api.handler import router
 
+# TODO: clean build process & use mangum for lambda
+
 # configuration values
 build_required = os.getenv("MORPH_FRONT_BUILD", "false")
 host = os.getenv("MORPH_UVICORN_HOST", "0.0.0.0")

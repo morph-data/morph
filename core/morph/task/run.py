@@ -60,6 +60,7 @@ class RunTask(BaseTask):
         self.vars: Dict[str, Any] = args.DATA
         self.is_filepath = os.path.splitext(os.path.basename(filename_or_alias))[1]
         self.mode = mode
+        self.api_key = ""
 
         # validate credentials
         config_path = MorphConstant.MORPH_CRED_PATH
@@ -79,9 +80,7 @@ class RunTask(BaseTask):
                 )
                 sys.exit(1)  # 1: General errors
 
-            self.api_key: str = config.get("default", "api_key", fallback="")
-
-            # env variable configuration
+            self.api_key = config.get("default", "api_key", fallback="")
             os.environ["MORPH_API_KEY"] = self.api_key
 
         try:
@@ -99,9 +98,6 @@ class RunTask(BaseTask):
         save_project(self.project_root, self.project)
         if self.project.project_id is not None:
             os.environ["MORPH_PROJECT_ID"] = self.project.project_id
-        self.project_id = None
-        if not has_config:
-            self.project_id = self.project.default_connection
 
         # Initialize database
         self.db_manager = SqliteDBManager(self.project_root)
@@ -271,7 +267,6 @@ class RunTask(BaseTask):
                 output = run_cell(
                     self.project,
                     self.resource,
-                    self.project_id,
                     self.db_manager,
                     self.vars,
                     self.logger,

@@ -58,7 +58,6 @@ class RunCellResult(BaseModel):
 def run_cell(
     project: Optional[MorphProject],
     cell: str | MorphFunctionMetaObject,
-    workspace_id_or_connection_slug: Optional[str],
     db_manager: SqliteDBManager,
     vars: dict[str, Any] = {},
     logger: logging.Logger | None = None,
@@ -103,7 +102,6 @@ def run_cell(
             required_data_result = _run_cell_with_dag(
                 project,
                 required_meta_obj,
-                workspace_id_or_connection_slug,
                 db_manager,
                 vars,
                 dag,
@@ -113,7 +111,6 @@ def run_cell(
             required_data_result = run_cell(
                 project,
                 required_meta_obj,
-                workspace_id_or_connection_slug,
                 db_manager,
                 vars,
                 logger,
@@ -292,9 +289,7 @@ def run_cell(
             logger.info(f"Formatting SQL file: {meta_obj.id} variables: {vars}")
         sql = _fill_sql(meta_obj, vars)
         return RunCellResult(
-            result=_run_sql(
-                project, meta_obj, sql, workspace_id_or_connection_slug, logger
-            ),
+            result=_run_sql(project, meta_obj, sql, logger),
             is_cache_valid=False,
         )
     else:
@@ -422,7 +417,6 @@ def _run_sql(
     project: Optional[MorphProject],
     resource: MorphFunctionMetaObject,
     sql: str,
-    workspace_id_or_connection_slug: Optional[str],
     logger: Optional[logging.Logger],
 ) -> pd.DataFrame:
     load_data = resource.data_requirements or []
@@ -476,7 +470,6 @@ def _run_sql(
 def _run_cell_with_dag(
     project: Optional[MorphProject],
     cell: MorphFunctionMetaObject,
-    workspace_id_or_connection_slug: Optional[str],
     db_manager: SqliteDBManager,
     vars: dict[str, Any] = {},
     dag: Optional[RunDagArgs] = None,
@@ -507,7 +500,6 @@ def _run_cell_with_dag(
         output = run_cell(
             project,
             cell,
-            workspace_id_or_connection_slug,
             db_manager,
             vars,
             logger,
