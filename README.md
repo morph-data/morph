@@ -17,7 +17,7 @@
 pip install morph-data
 ```
 
-1. Create a new project
+2. Create a new project
 
 ```bash
 morph new
