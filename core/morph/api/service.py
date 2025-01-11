@@ -730,16 +730,6 @@ async def file_upload_service(input: UploadFileService) -> Any:
 
         # Retrieve the saved file path from the output
         output_file = ast.literal_eval(run_result["outputs"])[0] if run_result else None
-        print(output_file)
-        with open(output_file, "r") as f:
-            saved_filepath = f.read()
-
-        if not os.path.isfile(saved_filepath):
-            raise WarningError(
-                ErrorCode.ExecutionError,
-                ErrorMessage.ExecutionErrorMessage["unexpectedResult"],
-                "file_path function did not return a valid file path",
-            )
 
         # Remove the temporary directory
         if os.path.exists(temp_dir):
@@ -751,7 +741,7 @@ async def file_upload_service(input: UploadFileService) -> Any:
 
         # Return the saved file path
         return JSONResponse(
-            content={"path": saved_filepath},
+            content={"path": output_file},
             status_code=200,
         )
     except Exception as e:
