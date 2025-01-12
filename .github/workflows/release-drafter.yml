@@ -1,15 +1,61 @@
 name: Release Drafter
+
 on:
-  push:
-    branches: develop
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+    branches:
+      - develop
+      - release/*
 
 jobs:
-  update_release_draft:
+  draft_release_notes:
+    if: >
+      (github.event.pull_request.base.ref == 'develop' &&
+       !startsWith(github.event.pull_request.head.ref, 'release/') &&
+       github.event.pull_request.head.ref != 'main') ||
+      startsWith(github.event.pull_request.base.ref, 'release/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Get current version from tags
+        id: get_current_version
+        run: |
+          # Get the latest tag (assuming tags follow semantic versioning)
+          CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "CURRENT_VERSION=${CURRENT_VERSION}" >> $GITHUB_ENV
+
+      - name: Determine next version
+        id: determine_next_version
+        run: |
+          if [[ "${{ github.event.pull_request.base.ref }}" == "develop" ]]; then
+            # Increment the minor version
+            IFS='.' read -r -a parts <<< "${CURRENT_VERSION#v}"
+            MAJOR=${parts[0]}
+            MINOR=${parts[1]}
+            PATCH=${parts[2]}
+            NEXT_VERSION="v${MAJOR}.$((MINOR + 1)).0"
+          elif [[ "${{ github.event.pull_request.base.ref }}" == release/* ]]; then
+            # Use the release branch version
+            NEXT_VERSION="${{ github.event.pull_request.base.ref##release/ }}"
+          fi
+          echo "NEXT_VERSION=${NEXT_VERSION}" >> $GITHUB_ENV
+          echo "Next version: ${NEXT_VERSION}"
+
       - name: Update release draft
         uses: release-drafter/release-drafter@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          version: ${{ env.NEXT_VERSION }}
+          config-name: ${{ github.event.pull_request.base.ref == 'develop' && 'develop' || 'release' }}
+
+  skip_on_merge_to_develop:
+    if: github.event.pull_request.base.ref == 'develop' &&
+        (startsWith(github.event.pull_request.head.ref, 'release/') ||
+         github.event.pull_request.head.ref == 'main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip updating release draft for merge into develop
+        run: echo "No action taken for merge from release/* or main into develop."
