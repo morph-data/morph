@@ -38,11 +38,12 @@ jobs:
             NEXT_VERSION="v${MAJOR}.$((MINOR + 1)).0"
           elif [[ "${{ github.event.pull_request.base.ref }}" == release/* ]]; then
             # Use the release branch version
-            NEXT_VERSION="${{ github.event.pull_request.base.ref##release/ }}"
+            base_ref="${{ github.event.pull_request.base.ref }}"
+            NEXT_VERSION="${base_ref#release/}"
           fi
           echo "NEXT_VERSION=${NEXT_VERSION}" >> $GITHUB_ENV
           echo "Next version: ${NEXT_VERSION}"
-
+      - name: Update release draft
       - name: Update release draft
         uses: release-drafter/release-drafter@v5
         env:
