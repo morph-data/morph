@@ -8,14 +8,12 @@ from pydantic import ValidationError
 from morph.api.auth import auth
 from morph.api.error import AuthError, ErrorCode, ErrorMessage, RequestError
 from morph.api.service import (
-    create_file_service,
     create_scheduled_job_service,
     delete_scheduled_job_service,
     file_upload_service,
     find_run_result_detail_service,
     find_run_result_service,
     find_scheduled_job_service,
-    list_resource_service,
     list_run_result_service,
     list_scheduled_jobs_service,
     run_file_service,
@@ -24,8 +22,6 @@ from morph.api.service import (
     update_scheduled_job_service,
 )
 from morph.api.types import (
-    CreateFileRequestBody,
-    CreateFileService,
     CreateScheduledJobService,
     DeleteScheduledJobService,
     FindRunResultDetailResponse,
@@ -160,37 +156,6 @@ def run_file(
             error_messages,
         )
     return run_file_service(input)
-
-
-@router.get("/cli/resource")
-def list_resource(
-    _: str = Security(auth),
-) -> Any:
-    return list_resource_service()
-
-
-@router.post("/cli/file")
-def create_file(
-    body: CreateFileRequestBody,
-    _: str = Security(auth),
-) -> SuccessResponse:
-    try:
-        input = CreateFileService(
-            filename=body.filename,
-            template=body.template,
-            name=body.name,
-            description=body.description,
-            parent_name=body.parentName,
-            connection=body.connection,
-        )
-    except ValidationError as e:
-        error_messages = " ".join([str(err["msg"]) for err in e.errors()])
-        raise RequestError(
-            ErrorCode.RequestError,
-            ErrorMessage.RequestErrorMessage["requestBodyInvalid"],
-            error_messages,
-        )
-    return create_file_service(input)
 
 
 @router.get("/cli/run/{name}")

@@ -1,13 +1,11 @@
 import ast
 import asyncio
-import io
 import json
 import logging
 import os
 import tempfile
 import time
 import uuid
-from contextlib import redirect_stdout
 from datetime import datetime
 from typing import Any, List
 
@@ -17,7 +15,6 @@ from fastapi.responses import JSONResponse
 
 from morph.api.error import ErrorCode, ErrorMessage, RequestError, WarningError
 from morph.api.types import (
-    CreateFileService,
     CreateScheduledJobService,
     DeleteScheduledJobService,
     FindRunResultDetailResponse,
@@ -44,8 +41,6 @@ from morph.api.utils import (
 )
 from morph.cli.flags import Flags
 from morph.config.project import ScheduledJob, load_project, save_project
-from morph.task.create import CreateTask
-from morph.task.resource import PrintResourceTask
 from morph.task.run import RunTask
 from morph.task.utils.morph import find_project_root_dir
 from morph.task.utils.run_backend.errors import MorphFunctionLoadError
@@ -324,50 +319,6 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
             }
             error_json = json.dumps(error_detail, ensure_ascii=False)
             raise Exception(error_json)
-
-
-def list_resource_service() -> Any:
-    with click.Context(click.Command(name="")) as ctx:
-        ctx.params["ALL"] = True
-        task = PrintResourceTask(Flags(ctx))
-
-        output = io.StringIO()
-        with redirect_stdout(output):
-            task.run()
-
-        result = output.getvalue()
-        try:
-            return json.loads(result)
-        except json.JSONDecodeError:  # noqa
-            raise WarningError(
-                ErrorCode.FileError,
-                ErrorMessage.FileErrorMessage["notFound"],
-                result,
-            )
-
-
-def create_file_service(input: CreateFileService) -> SuccessResponse:
-    with click.Context(click.Command(name="")) as ctx:
-        ctx.params["FILENAME"] = input.filename
-        ctx.params["TEMPLATE"] = input.template
-        ctx.params["NAME"] = input.name
-        ctx.params["DESCRIPTION"] = input.description
-        ctx.params["PARENT_NAME"] = input.parent_name
-        ctx.params["CONNECTION"] = input.connection
-        task = CreateTask(Flags(ctx))
-
-        output = io.StringIO()
-        with redirect_stdout(output):
-            task.run()
-
-        result = output.getvalue()
-        if "Error" in result:
-            raise WarningError(
-                ErrorCode.FileError,
-                ErrorMessage.FileErrorMessage["createFailed"],
-                result,
-            )
-        return SuccessResponse(message="ok")
 
 
 def list_run_result_service(input: ListRunResultService) -> ListRunResultResponse:
