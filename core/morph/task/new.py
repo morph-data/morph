@@ -79,6 +79,23 @@ class NewTask(BaseTask):
         if self.args.PROJECT_ID:
             project.project_id = self.args.PROJECT_ID
 
+        # Ask the user to select a package manager
+        project.package_manager = (
+            input("Which package manager do you want to use? (pip/poetry): ")
+            .strip()
+            .lower()
+        )
+
+        # Default to pip if the input is invalid
+        if project.package_manager not in ["pip", "poetry"]:
+            click.echo(
+                click.style(
+                    "Warning: Invalid package manager. Defaulting to 'pip'.",
+                    fg="yellow",
+                )
+            )
+            project.package_manager = "pip"
+
         connection_yaml = ConnectionYaml.load_yaml()
         if len(list(connection_yaml.connections.keys())) > 0:
             default_connection = list(connection_yaml.connections.keys())[0]
@@ -88,47 +105,23 @@ class NewTask(BaseTask):
 
         os.chdir(original_working_dir)
 
-        self.generate_dockerfile()
-
-        click.echo(click.style("Project setup completed successfully! 🎉", fg="green"))
-
-        return True
-
-    def generate_dockerfile(self):
-        """
-        Generate a Dockerfile for AWS Lambda deployment.
-        """
+        # Generate the Dockerfile template
         click.echo("Generating Dockerfile...")
-
-        # Ask the user to select a package manager
-        package_manager = (
-            input("Which package manager do you want to use? (pip/poetry): ")
-            .strip()
-            .lower()
+        template_dir = Path(__file__).parents[1].joinpath("include")
+        docker_template_file = template_dir.joinpath(
+            f"Dockerfile.{project.package_manager}"
         )
-
-        # Default to pip if the input is invalid
-        if package_manager not in ["pip", "poetry"]:
+        if not docker_template_file.exists():
             click.echo(
                 click.style(
-                    "Warning: Invalid package manager. Defaulting to 'pip'.",
-                    fg="yellow",
+                    f"Template file not found: {docker_template_file}", fg="red"
                 )
-            )
-            package_manager = "pip"
-
-        # Determine the template path based on the package manager
-        template_dir = Path(__file__).parents[1].joinpath("include")
-        template_file = template_dir.joinpath(f"Dockerfile.{package_manager}")
-
-        if not template_file.exists():
-            click.echo(
-                click.style(f"Template file not found: {template_file}", fg="red")
             )
             sys.exit(1)
 
-        # Copy the selected template to the project directory
+        # Copy the selected Dockerfile to the project directory
         dockerfile_path = os.path.join(self.project_root, "Dockerfile")
-        shutil.copy2(template_file, dockerfile_path)
+        shutil.copy2(docker_template_file, dockerfile_path)
 
-        click.echo(click.style(f"Dockerfile created at {dockerfile_path}", fg="green"))
+        click.echo(click.style("Project setup completed successfully! 🎉", fg="green"))
+        return True

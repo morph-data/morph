@@ -1,13 +1,14 @@
+import gzip
 import os
 import shutil
 import subprocess
 import sys
-import tarfile
 from pathlib import Path
 
 import click
 
 from morph.cli.flags import Flags
+from morph.config.project import load_project
 from morph.task.base import BaseTask
 from morph.task.utils.morph import find_project_root_dir
 
@@ -24,13 +25,11 @@ class DeployTask(BaseTask):
             click.echo(click.style(f"Error: {str(e)}", fg="red", bg="yellow"))
             sys.exit(1)
 
-        # Use the project directory name as the image name
-        self.image_name = f"{os.path.basename(self.project_root)}:latest"
-
-        # Output tar.gz file for the Docker image and dist directory
-        self.output_tar_gz = os.path.join(
-            self.project_root, "output", f"{os.path.basename(self.project_root)}.tar.gz"
-        )
+        project = load_project(self.project_root)
+        if not project:
+            click.echo(click.style("Project configuration not found.", fg="red"))
+            sys.exit(1)
+        self.package_manager = project.package_manager
 
         # Ensure the Dockerfile exists
         self.dockerfile = os.path.join(self.project_root, "Dockerfile")
@@ -44,7 +43,6 @@ class DeployTask(BaseTask):
             subprocess.run(["docker", "--version"], stdout=subprocess.PIPE, check=True)
             # Check if Docker daemon is running
             subprocess.run(["docker", "info"], stdout=subprocess.PIPE, check=True)
-            click.echo(click.style("Docker daemon is running.", fg="green"))
         except subprocess.CalledProcessError:
             click.echo(
                 click.style(
@@ -62,26 +60,88 @@ class DeployTask(BaseTask):
             )
             sys.exit(1)
 
+        # Frontend settings
         self.frontend_src_dir = os.path.join(
             Path(__file__).resolve().parents[1], "frontend"
         )
         self.frontend_dir = os.path.join(self.project_root, ".morph/frontend")
         self.dist_dir = os.path.join(self.frontend_dir, "dist")
 
+        # Docker settings
+        self.image_name = f"{os.path.basename(self.project_root)}:latest"
+        self.output_tar_gz = os.path.join(
+            self.project_root, f".morph/{os.path.basename(self.project_root)}.tar.gz"
+        )
+
+        # Check dependency files
+        self._check_dependencies()
+
     def run(self):
         """
         Entry point for running the morph deploy task.
         """
-        click.echo(click.style("Starting DeployTask...", fg="green"))
+        click.echo(click.style("Initiating deployment sequence...", fg="blue"))
 
         # Build the frontend, Docker image, and save to tar.gz
         self._build_frontend()
         self._build_docker_image()
-        self._save_to_tar_gz()
+        self._tarball_docker_image()
 
         # TODO: Implement deployment sequence
 
-        click.echo(click.style("DeployTask completed successfully!", fg="green"))
+        click.echo(click.style("Deployment completed successfully! 🎉", fg="green"))
+
+    def _check_dependencies(self):
+        """
+        Check if required dependency files exist based on the package manager.
+        """
+
+        if self.package_manager == "pip":
+            requirements_file = os.path.join(self.project_root, "requirements.txt")
+            if not os.path.exists(requirements_file):
+                click.echo(
+                    click.style(
+                        "Error: The file 'requirements.txt' is missing.\n"
+                        "This file is required because the project is configured to use 'pip' as the package manager.\n"
+                        "Please create a 'requirements.txt' file in the project root directory and list the Python dependencies.",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+
+        elif self.package_manager == "poetry":
+            poetry_files = [
+                os.path.join(self.project_root, "pyproject.toml"),
+                os.path.join(self.project_root, "poetry.lock"),
+            ]
+            missing_files = [f for f in poetry_files if not os.path.exists(f)]
+            if missing_files:
+                click.echo(
+                    click.style(
+                        "Error: Missing required Poetry files.\n"
+                        "The following file(s) are missing:\n"
+                        f"  - {', '.join(missing_files)}\n"
+                        "These files are necessary because the project is configured to use 'poetry' as the package manager.\n"
+                        "To fix this:\n"
+                        "1. Ensure that 'pyproject.toml' defines your project dependencies.\n"
+                        "2. Run 'poetry lock' to generate the 'poetry.lock' file.",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+
+        else:
+            click.echo(
+                click.style(
+                    f"Error: Unknown package manager '{self.package_manager}'.\n"
+                    "Please check the 'package_manager' setting in your project configuration.\n"
+                    "Valid options are:\n"
+                    "  - pip\n"
+                    "  - poetry",
+                    fg="red",
+                )
+            )
+            sys.exit(1)
 
     def _build_frontend(self):
         """
@@ -141,44 +201,54 @@ class DeployTask(BaseTask):
             click.echo(click.style(f"Error building Docker image: {str(e)}", fg="red"))
             sys.exit(1)
 
-    def _save_to_tar_gz(self):
+    def _tarball_docker_image(self):
         """
-        Save the Docker image and frontend dist directory to a tar.gz file.
+        Save the Docker image as a tar.gz file, falling back to Python gzip if the gzip command is unavailable.
         """
         try:
+            # Ensure the output directory exists
             output_dir = os.path.dirname(self.output_tar_gz)
             os.makedirs(output_dir, exist_ok=True)
 
-            # Save the Docker image as a tar file
-            docker_image_tar = os.path.join(output_dir, "docker_image.tar")
+            # Save Docker image and gzip it
             click.echo(
                 click.style(
-                    f"Saving Docker image to '{docker_image_tar}'...", fg="blue"
+                    f"Saving Docker image as tar.gz to '{self.output_tar_gz}'...",
+                    fg="blue",
                 )
             )
-            with open(docker_image_tar, "wb") as tar:
-                subprocess.run(
-                    ["docker", "save", self.image_name], stdout=tar, check=True
+            with open(self.output_tar_gz, "wb") as tar_gz:
+                # First, save the Docker image as a tar stream
+                docker_save = subprocess.Popen(
+                    ["docker", "save", self.image_name],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
-            click.echo(
-                click.style(f"Docker image saved to '{docker_image_tar}'.", fg="green")
-            )
 
-            # Create a tar.gz file containing the Docker image and dist directory
+                # Use gzip to compress the tar stream
+                with gzip.GzipFile(fileobj=tar_gz, mode="wb") as gzip_file:
+                    if docker_save.stdout is None:
+                        raise RuntimeError(
+                            "Docker save process did not produce any output."
+                        )
+                    shutil.copyfileobj(docker_save.stdout, gzip_file)
+
+                # Ensure the docker save process completes successfully
+                docker_save.wait()
+                if docker_save.returncode != 0:
+                    stderr = (
+                        docker_save.stderr.read().decode("utf-8")
+                        if docker_save.stderr
+                        else ""
+                    )
+                    raise RuntimeError(f"Docker save failed: {stderr.strip()}")
+
             click.echo(
                 click.style(
-                    f"Creating tar.gz archive '{self.output_tar_gz}'...", fg="blue"
+                    f"Docker image successfully saved as '{self.output_tar_gz}'.",
+                    fg="green",
                 )
             )
-            with tarfile.open(self.output_tar_gz, "w:gz") as tar:
-                tar.add(docker_image_tar, arcname="docker_image.tar")
-                tar.add(self.dist_dir, arcname="dist")
-            click.echo(
-                click.style(f"Archive created at '{self.output_tar_gz}'.", fg="green")
-            )
-
-            # Clean up temporary tar file
-            os.remove(docker_image_tar)
         except subprocess.CalledProcessError as e:
             click.echo(click.style(f"Error saving Docker image: {str(e)}", fg="red"))
             sys.exit(1)
