@@ -719,7 +719,7 @@ class ConnectionYaml(BaseModel):
                 host = match.group("host")
                 database = match.group("database")
 
-                return client.req.workspace_id, PostgresqlConnection(
+                return client.req.project_id, PostgresqlConnection(
                     type=CONNECTION_TYPE.postgres,
                     host=host,
                     user=username,
@@ -735,6 +735,9 @@ class ConnectionYaml(BaseModel):
     ) -> Connection:
         if connection_slug == MORPH_DUCKDB_CONNECTION_SLUG:
             return DuckDBConnection(type=CONNECTION_TYPE.duckdb)
+        elif connection_slug == MORPH_BUILTIN_DB_CONNECTION_SLUG:
+            _, builtin_connection = ConnectionYaml.find_builtin_db_connection()
+            return builtin_connection
         try:
             try:
                 client = MorphApiClient(MorphApiKeyClientImpl)
