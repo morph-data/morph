@@ -106,7 +106,6 @@ class NewTask(BaseTask):
         os.chdir(original_working_dir)
 
         # Generate the Dockerfile template
-        click.echo("Generating Dockerfile...")
         template_dir = Path(__file__).parents[1].joinpath("include")
         docker_template_file = template_dir.joinpath(
             f"Dockerfile.{project.package_manager}"

@@ -5,6 +5,7 @@ FROM public.ecr.aws/lambda/python:3.9
 WORKDIR /var/task
 
 # Copy source code and dependencies
+COPY .morph/main.py /var/task/main.py
 COPY .morph/frontend/dist /var/task/dist
 COPY .morph/frontend/src /var/task/src
 
@@ -13,4 +14,4 @@ COPY requirements.txt /var/task/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Command to run the Lambda function
-CMD ["app.lambda_handler"]
+CMD ["main.handler"]

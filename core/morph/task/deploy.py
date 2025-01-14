@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import click
+from tqdm import tqdm
 
 from morph.cli.flags import Flags
 from morph.config.project import load_project
@@ -17,6 +18,7 @@ class DeployTask(BaseTask):
     def __init__(self, args: Flags):
         super().__init__(args)
         self.args = args
+        self.no_cache = args.NO_CACHE
         self.is_verbose = args.VERBOSE
 
         try:
@@ -81,6 +83,16 @@ class DeployTask(BaseTask):
         Entry point for running the morph deploy task.
         """
         click.echo(click.style("Initiating deployment sequence...", fg="blue"))
+
+        # Copy main.py (entrypoint for lambda) to .morph directory
+        template_dir = Path(__file__).parents[1].joinpath("include")
+        entrypoint_file = template_dir.joinpath("main.py")
+        if not entrypoint_file.exists():
+            click.echo(
+                click.style(f"Entrypoint file not found: {entrypoint_file}", fg="red")
+            )
+            sys.exit(1)
+        shutil.copy2(entrypoint_file, os.path.join(self.project_root, ".morph/main.py"))
 
         # Build the frontend, Docker image, and save to tar.gz
         self._build_frontend()
@@ -180,18 +192,18 @@ class DeployTask(BaseTask):
             click.echo(
                 click.style(f"Building Docker image '{self.image_name}'...", fg="blue")
             )
-            subprocess.run(
-                [
-                    "docker",
-                    "build",
-                    "-t",
-                    self.image_name,
-                    "-f",
-                    self.dockerfile,
-                    self.project_root,
-                ],
-                check=True,
-            )
+            docker_build_cmd = [
+                "docker",
+                "build",
+                "-t",
+                self.image_name,
+                "-f",
+                self.dockerfile,
+                self.project_root,
+            ]
+            if self.no_cache:
+                docker_build_cmd.append("--no-cache")
+            subprocess.run(docker_build_cmd, check=True)
             click.echo(
                 click.style(
                     f"Docker image '{self.image_name}' built successfully.", fg="green"
@@ -203,7 +215,7 @@ class DeployTask(BaseTask):
 
     def _tarball_docker_image(self):
         """
-        Save the Docker image as a tar.gz file, falling back to Python gzip if the gzip command is unavailable.
+        Save the Docker image as a tar.gz file, with a progress bar and percentage display.
         """
         try:
             # Ensure the output directory exists
@@ -217,31 +229,57 @@ class DeployTask(BaseTask):
                     fg="blue",
                 )
             )
+
+            # First, save the Docker image as a tar stream and get the total size
+            docker_save = subprocess.Popen(
+                ["docker", "save", self.image_name],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            if docker_save.stdout is None:
+                raise RuntimeError("Docker save process did not produce any output.")
+
+            # Get an approximate size of the tarball by reading its header
+            total_size = 0
+            header_size = 512  # Tar block size
+            for _ in range(20):  # Read the first 20 blocks to estimate size
+                chunk = docker_save.stdout.read(header_size)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+
+            # Estimate total size if not already determined
+            total_size_mb = (
+                total_size / (1024 * 1024) if total_size else 100
+            )  # Default to 100MB for display
+
+            # Use gzip to compress the tar stream
             with open(self.output_tar_gz, "wb") as tar_gz:
-                # First, save the Docker image as a tar stream
-                docker_save = subprocess.Popen(
-                    ["docker", "save", self.image_name],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-
-                # Use gzip to compress the tar stream
                 with gzip.GzipFile(fileobj=tar_gz, mode="wb") as gzip_file:
-                    if docker_save.stdout is None:
-                        raise RuntimeError(
-                            "Docker save process did not produce any output."
-                        )
-                    shutil.copyfileobj(docker_save.stdout, gzip_file)
+                    buffer_size = 1024 * 1024  # 1 MB buffer size
+                    with tqdm(
+                        total=total_size_mb,
+                        unit="MB",
+                        unit_scale=True,
+                        desc="Compressing",
+                    ) as pbar:
+                        while True:
+                            chunk = docker_save.stdout.read(buffer_size)
+                            if not chunk:
+                                break
+                            gzip_file.write(chunk)
+                            pbar.update(len(chunk) / (1024 * 1024))
 
-                # Ensure the docker save process completes successfully
-                docker_save.wait()
-                if docker_save.returncode != 0:
-                    stderr = (
-                        docker_save.stderr.read().decode("utf-8")
-                        if docker_save.stderr
-                        else ""
-                    )
-                    raise RuntimeError(f"Docker save failed: {stderr.strip()}")
+                    # Ensure the docker save process completes successfully
+                    docker_save.wait()
+                    if docker_save.returncode != 0:
+                        stderr = (
+                            docker_save.stderr.read().decode("utf-8")
+                            if docker_save.stderr
+                            else ""
+                        )
+                        raise RuntimeError(f"Docker save failed: {stderr.strip()}")
 
             click.echo(
                 click.style(
