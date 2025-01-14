@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -26,43 +27,78 @@ class DeployTask(BaseTask):
         # Use the project directory name as the image name
         self.image_name = f"{os.path.basename(self.project_root)}:latest"
 
-        # Path for the frontend directory
-        current_dir = Path(__file__).resolve()
-        self.frontend_dir = os.path.join(current_dir.parents[1], "frontend")
-        self.dist_dir = os.path.join(self.frontend_dir, "dist")
-
         # Output tar.gz file for the Docker image and dist directory
         self.output_tar_gz = os.path.join(
             self.project_root, "output", f"{os.path.basename(self.project_root)}.tar.gz"
         )
 
-        # TODO: Consider adding a flag to specify the Dockerfile path
         # Ensure the Dockerfile exists
         self.dockerfile = os.path.join(self.project_root, "Dockerfile")
         if not os.path.exists(self.dockerfile):
             click.echo(click.style(f"Error: {self.dockerfile} not found", fg="red"))
             sys.exit(1)
 
+        try:
+            # Check if Docker CLI is installed
+            click.echo(click.style("Checking Docker daemon status...", fg="blue"))
+            subprocess.run(["docker", "--version"], stdout=subprocess.PIPE, check=True)
+            # Check if Docker daemon is running
+            subprocess.run(["docker", "info"], stdout=subprocess.PIPE, check=True)
+            click.echo(click.style("Docker daemon is running.", fg="green"))
+        except subprocess.CalledProcessError:
+            click.echo(
+                click.style(
+                    "Docker daemon is not running. Please (re)start Docker and try again.",
+                    fg="red",
+                )
+            )
+            sys.exit(1)
+        except FileNotFoundError:
+            click.echo(
+                click.style(
+                    "Docker is not installed. Please install Docker and try again.",
+                    fg="red",
+                )
+            )
+            sys.exit(1)
+
+        self.frontend_src_dir = os.path.join(
+            Path(__file__).resolve().parents[1], "frontend"
+        )
+        self.frontend_dir = os.path.join(self.project_root, ".morph/frontend")
+        self.dist_dir = os.path.join(self.frontend_dir, "dist")
+
     def run(self):
         """
-        Entry point for running the deploy task.
+        Entry point for running the morph deploy task.
         """
         click.echo(click.style("Starting DeployTask...", fg="green"))
-        self.build_frontend()
-        self.build_docker_image()
-        self.save_to_tar_gz()
+
+        # Build the frontend, Docker image, and save to tar.gz
+        self._build_frontend()
+        self._build_docker_image()
+        self._save_to_tar_gz()
+
+        # TODO: Implement deployment sequence
+
         click.echo(click.style("DeployTask completed successfully!", fg="green"))
 
-    def build_frontend(self):
+    def _build_frontend(self):
         """
         Build the frontend using npm.
         """
         try:
             click.echo(click.style("Building frontend...", fg="blue"))
             # Install dependencies
-            subprocess.run(["npm", "install"], cwd=self.frontend_dir, check=True)
+            subprocess.run(["npm", "install"], cwd=self.frontend_src_dir, check=True)
             # Run the build script
-            subprocess.run(["npm", "run", "build"], cwd=self.frontend_dir, check=True)
+            subprocess.run(
+                ["npm", "run", "build"], cwd=self.frontend_src_dir, check=True
+            )
+            # Copy build artifact to .morph/frontend
+            if os.path.exists(self.frontend_dir):
+                shutil.rmtree(self.frontend_dir)
+            shutil.copytree(self.frontend_src_dir, self.frontend_dir)
             # Ensure the dist directory exists after building
             if not os.path.exists(self.dist_dir):
                 raise FileNotFoundError(
@@ -76,7 +112,7 @@ class DeployTask(BaseTask):
             click.echo(click.style(f"Unexpected error: {str(e)}", fg="red"))
             sys.exit(1)
 
-    def build_docker_image(self):
+    def _build_docker_image(self):
         """
         Build the Docker image.
         """
@@ -105,7 +141,7 @@ class DeployTask(BaseTask):
             click.echo(click.style(f"Error building Docker image: {str(e)}", fg="red"))
             sys.exit(1)
 
-    def save_to_tar_gz(self):
+    def _save_to_tar_gz(self):
         """
         Save the Docker image and frontend dist directory to a tar.gz file.
         """
