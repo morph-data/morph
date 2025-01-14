@@ -1,0 +1,16 @@
+# Base image for AWS Lambda
+FROM public.ecr.aws/lambda/python:3.9
+
+# Set working directory
+WORKDIR /var/task
+
+# Copy source code and dependencies
+COPY dist /var/task/dist
+COPY src /var/task/src
+
+# Install Python dependencies with poetry
+COPY poetry.lock pyproject.toml /var/task/
+RUN pip install --no-cache-dir poetry && poetry install --no-dev --no-interaction
+
+# Command to run the Lambda function
+CMD ["app.lambda_handler"]
