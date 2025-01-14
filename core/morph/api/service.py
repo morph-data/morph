@@ -8,8 +8,7 @@ import tempfile
 import time
 import uuid
 from contextlib import redirect_stdout
-from datetime import datetime
-from typing import Any, List
+from typing import Any
 
 import click
 from fastapi import HTTPException
@@ -17,24 +16,11 @@ from fastapi.responses import JSONResponse
 
 from morph.api.error import ErrorCode, ErrorMessage, RequestError, WarningError
 from morph.api.types import (
-    CreateFileService,
-    CreateScheduledJobService,
-    DeleteScheduledJobService,
-    FindRunResultDetailResponse,
-    FindRunResultDetailService,
-    FindRunResultResponse,
-    FindRunResultService,
-    FindScheduledJobService,
-    ListRunResultResponse,
-    ListRunResultService,
     RunFileService,
     RunFileStreamService,
     RunFileWithTypeResponse,
     RunFileWithTypeService,
-    RunResult,
-    RunResultUnit,
     SuccessResponse,
-    UpdateScheduledJobService,
     UploadFileService,
 )
 from morph.api.utils import (
@@ -43,8 +29,7 @@ from morph.api.utils import (
     convert_vg_json_to_html,
 )
 from morph.cli.flags import Flags
-from morph.config.project import ScheduledJob, load_project, save_project
-from morph.task.create import CreateTask
+from morph.config.project import load_project
 from morph.task.resource import PrintResourceTask
 from morph.task.run import RunTask
 from morph.task.utils.morph import find_project_root_dir
@@ -346,253 +331,6 @@ def list_resource_service() -> Any:
             )
 
 
-def create_file_service(input: CreateFileService) -> SuccessResponse:
-    with click.Context(click.Command(name="")) as ctx:
-        ctx.params["FILENAME"] = input.filename
-        ctx.params["TEMPLATE"] = input.template
-        ctx.params["NAME"] = input.name
-        ctx.params["DESCRIPTION"] = input.description
-        ctx.params["PARENT_NAME"] = input.parent_name
-        ctx.params["CONNECTION"] = input.connection
-        task = CreateTask(Flags(ctx))
-
-        output = io.StringIO()
-        with redirect_stdout(output):
-            task.run()
-
-        result = output.getvalue()
-        if "Error" in result:
-            raise WarningError(
-                ErrorCode.FileError,
-                ErrorMessage.FileErrorMessage["createFailed"],
-                result,
-            )
-        return SuccessResponse(message="ok")
-
-
-def list_run_result_service(input: ListRunResultService) -> ListRunResultResponse:
-    project_root = find_project_root_dir()
-    db_manager = SqliteDBManager(project_root)
-    db_manager.initialize_database()
-
-    run_records, count = db_manager.get_run_records(
-        canvas=None,
-        cell_alias=input.name,
-        status=None,
-        sort_by="started_at",
-        order="DESC",
-        limit=input.limit,
-        skip=input.skip,
-    )
-
-    run_results: List[RunResult] = []
-    for run_record in run_records:
-        cells = db_manager.get_run_records_by_run_id(run_record["run_id"])
-
-        run_result = RunResult(
-            runId=run_record["run_id"],
-            cells=[],
-            status=run_record["status"],
-            startedAt=run_record["started_at"],
-        )
-
-        ended_at = None
-        error = None
-        for cell in cells:
-            outputs = []
-            try:
-                outputs = ast.literal_eval(cell["outputs"])
-            except Exception:  # noqa
-                pass
-            cell_error = cell["error"]
-            if cell["error"]:
-                try:
-                    cell_error = json.loads(cell["error"])["details"]
-                except json.JSONDecodeError:
-                    pass
-            run_result.cells.append(
-                RunResultUnit(
-                    name=cell["cell_alias"],
-                    status=cell["status"],
-                    startedAt=cell["started_at"],
-                    logs=[cell["log"]] if cell["log"] else [],
-                    outputs=outputs,
-                    endedAt=cell["ended_at"],
-                    error=cell_error,
-                )
-            )
-            if ended_at is None:
-                ended_at = cell["ended_at"]
-            if cell["error"]:
-                error = cell["error"]
-            if cell["ended_at"]:
-                cell_ended_at = datetime.fromisoformat(cell["ended_at"])
-                if ended_at and cell_ended_at > datetime.fromisoformat(ended_at):
-                    ended_at = cell["ended_at"]
-
-        if error:
-            try:
-                error = json.loads(error)["details"]
-            except json.JSONDecodeError:
-                pass
-        run_result.error = error
-        run_result.endedAt = ended_at
-
-        run_results.append(run_result)
-
-    return ListRunResultResponse(count=count, items=run_results)
-
-
-def find_run_result_service(input: FindRunResultService) -> FindRunResultResponse:
-    project_root = find_project_root_dir()
-    db_manager = SqliteDBManager(project_root)
-    db_manager.initialize_database()
-
-    cells = db_manager.get_run_records_by_run_id(input.run_id)
-
-    if len(cells) == 0:
-        raise WarningError(
-            ErrorCode.FileError,
-            ErrorMessage.FileErrorMessage["notFound"],
-            "run result not found",
-        )
-
-    run_result = FindRunResultResponse(
-        runId=input.run_id,
-        cells=[],
-        status=cells[-1]["status"],
-        startedAt=cells[0]["started_at"],
-    )
-
-    ended_at = None
-    error = None
-    for cell in cells:
-        outputs = []
-        try:
-            outputs = ast.literal_eval(cell["outputs"])
-        except Exception:  # noqa
-            pass
-        cell_error = cell["error"]
-        if cell["error"]:
-            try:
-                cell_error = json.loads(cell["error"])["details"]
-            except json.JSONDecodeError:
-                pass
-        run_result.cells.append(
-            RunResultUnit(
-                name=cell["cell_alias"],
-                status=cell["status"],
-                startedAt=cell["started_at"],
-                logs=[cell["log"]] if cell["log"] else [],
-                outputs=outputs,
-                endedAt=cell["ended_at"],
-                error=cell_error,
-            )
-        )
-        if ended_at is None:
-            ended_at = cell["ended_at"]
-        if cell["error"]:
-            error = cell["error"]
-        if cell["ended_at"]:
-            cell_ended_at = datetime.fromisoformat(cell["ended_at"])
-            if ended_at and cell_ended_at > datetime.fromisoformat(ended_at):
-                ended_at = cell["ended_at"]
-
-    if error:
-        try:
-            error = json.loads(error)["details"]
-        except json.JSONDecodeError:
-            pass
-    run_result.error = error
-    run_result.endedAt = ended_at
-
-    return run_result
-
-
-def find_run_result_detail_service(
-    input: FindRunResultDetailService,
-) -> FindRunResultDetailResponse:
-    project_root = find_project_root_dir()
-    db_manager = SqliteDBManager(project_root)
-    db_manager.initialize_database()
-
-    run_records, _ = db_manager.get_run_records(
-        canvas=None,
-        cell_alias=input.name,
-        status="done",
-        sort_by="started_at",
-        order="DESC",
-        limit=1,
-        skip=0,
-        run_id=input.run_id,
-    )
-
-    if len(run_records) == 0:
-        raise WarningError(
-            ErrorCode.ExecutionError,
-            ErrorMessage.ExecutionErrorMessage["executionFailed"],
-            "run result not found",
-        )
-    elif run_records[0]["outputs"] is None or len(run_records[0]["outputs"]) == 0:
-        raise WarningError(
-            ErrorCode.ExecutionError,
-            ErrorMessage.ExecutionErrorMessage["executionFailed"],
-            "output not found",
-        )
-
-    output_paths = []
-    try:
-        output_paths = ast.literal_eval(run_records[0]["outputs"])
-    except Exception:  # noqa
-        raise WarningError(
-            ErrorCode.ExecutionError,
-            ErrorMessage.ExecutionErrorMessage["executionFailed"],
-            "output not found",
-        )
-    output_path = output_paths[0]
-    if input.type == "image" or input.type == "html":
-        if len(output_paths) == 2:
-            if input.type == "image" and output_path.endswith(".html"):
-                output_path = output_paths[1]
-            elif input.type == "html" and not output_path.endswith(".html"):
-                output_path = output_paths[1]
-        elif len(output_paths) == 1:
-            if input.type == "image" and output_path.endswith(".html"):
-                raise WarningError(
-                    ErrorCode.ExecutionError,
-                    ErrorMessage.ExecutionErrorMessage["executionFailed"],
-                    "image not found",
-                )
-            elif (
-                input.type == "html"
-                and not output_path.endswith(".html")
-                and not output_path.endswith(".txt")
-            ):
-                raise WarningError(
-                    ErrorCode.ExecutionError,
-                    ErrorMessage.ExecutionErrorMessage["executionFailed"],
-                    "html not found",
-                )
-
-    ext = output_path.split(".")[-1]
-
-    try:
-        data = convert_file_output(
-            input.type, output_path, ext, input.limit, input.skip
-        )
-    except Exception:  # noqa
-        raise WarningError(
-            ErrorCode.ExecutionError,
-            ErrorMessage.ExecutionErrorMessage["executionFailed"],
-            "file type invalid",
-        )
-
-    return FindRunResultDetailResponse(
-        type=input.type,
-        data=data,
-    )
-
-
 def list_scheduled_jobs_service() -> Any:
     project_root = find_project_root_dir()
     project = load_project(project_root)
@@ -607,95 +345,6 @@ def list_scheduled_jobs_service() -> Any:
         return []
 
     return project.scheduled_jobs
-
-
-def find_scheduled_job_service(input: FindScheduledJobService) -> Any:
-    project_root = find_project_root_dir()
-    project = load_project(project_root)
-    if project is None:
-        raise WarningError(
-            ErrorCode.FileError,
-            ErrorMessage.FileErrorMessage["formatInvalid"],
-            "Failed to load morph_project.yml",
-        )
-
-    if project.scheduled_jobs is None or input.name not in project.scheduled_jobs:
-        raise WarningError(
-            ErrorCode.FileError,
-            ErrorMessage.FileErrorMessage["notFound"],
-            f"Scheduled job not found {input.name}",
-        )
-
-    return project.scheduled_jobs[input.name].schedules[input.index]
-
-
-def create_scheduled_job_service(input: CreateScheduledJobService) -> Any:
-    project_root = find_project_root_dir()
-    project = load_project(project_root)
-    if project is None:
-        raise WarningError(
-            ErrorCode.FileError,
-            ErrorMessage.FileErrorMessage["formatInvalid"],
-            "Failed to load morph_project.yml",
-        )
-
-    if project.scheduled_jobs is None:
-        project.scheduled_jobs = {}
-
-    if input.name not in project.scheduled_jobs:
-        project.scheduled_jobs[input.name] = ScheduledJob(schedules=[input.schedule])
-    else:
-        project.scheduled_jobs[input.name].schedules.append(input.schedule)
-
-    save_project(project_root, project)
-
-    return project.scheduled_jobs[input.name].schedules
-
-
-def update_scheduled_job_service(input: UpdateScheduledJobService) -> Any:
-    project_root = find_project_root_dir()
-    project = load_project(project_root)
-    if project is None:
-        raise WarningError(
-            ErrorCode.FileError,
-            ErrorMessage.FileErrorMessage["formatInvalid"],
-            "Failed to load morph_project.yml",
-        )
-
-    if project.scheduled_jobs is None or input.name not in project.scheduled_jobs:
-        raise WarningError(
-            ErrorCode.FileError,
-            ErrorMessage.FileErrorMessage["notFound"],
-            f"Scheduled job not found {input.name}",
-        )
-
-    project.scheduled_jobs[input.name].schedules[input.index] = input.schedule
-    save_project(project_root, project)
-
-    return project.scheduled_jobs[input.name].schedules[input.index]
-
-
-def delete_scheduled_job_service(input: DeleteScheduledJobService) -> Any:
-    project_root = find_project_root_dir()
-    project = load_project(project_root)
-    if project is None:
-        raise WarningError(
-            ErrorCode.FileError,
-            ErrorMessage.FileErrorMessage["formatInvalid"],
-            "Failed to load morph_project.yml",
-        )
-
-    if project.scheduled_jobs is None or input.name not in project.scheduled_jobs:
-        raise WarningError(
-            ErrorCode.FileError,
-            ErrorMessage.FileErrorMessage["notFound"],
-            f"Scheduled job not found {input.name}",
-        )
-
-    del project.scheduled_jobs[input.name].schedules[input.index]
-    save_project(project_root, project)
-
-    return project.scheduled_jobs[input.name].schedules
 
 
 async def file_upload_service(input: UploadFileService) -> Any:
