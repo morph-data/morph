@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from morph.constants import MorphConstant
 from morph.task.utils.connection import (
     CONNECTION_TYPE,
-    MORPH_BUILTIN_DB_CONNECTION_SLUG,
+    MORPH_DUCKDB_CONNECTION_SLUG,
     MorphConnection,
 )
 
@@ -26,7 +26,7 @@ class ScheduledJob(BaseModel):
 class MorphProject(BaseModel):
     profile: Optional[str] = "default"
     source_paths: List[str] = Field(default_factory=lambda: ["src"])
-    default_connection: Optional[str] = MORPH_BUILTIN_DB_CONNECTION_SLUG
+    default_connection: Optional[str] = MORPH_DUCKDB_CONNECTION_SLUG
     output_paths: List[str] = Field(
         default_factory=lambda: [
             f"{MorphConstant.TMP_MORPH_DIR}/{{name}}/{{run_id}}{{ext()}}"
@@ -34,6 +34,7 @@ class MorphProject(BaseModel):
     )
     scheduled_jobs: Optional[Dict[str, ScheduledJob]] = Field(default=None)
     result_cache_ttl: Optional[int] = Field(default=0)
+    project_id: Optional[str] = Field(default=None)
 
     class Config:
         arbitrary_types_allowed = True
@@ -67,7 +68,7 @@ def load_project(project_root: str) -> Optional[MorphProject]:
             if default_connection_dict.connection_slug is not None:
                 data["default_connection"] = default_connection_dict.connection_slug
             elif default_connection_dict.database_id is not None:
-                data["default_connection"] = MORPH_BUILTIN_DB_CONNECTION_SLUG
+                data["default_connection"] = MORPH_DUCKDB_CONNECTION_SLUG
         else:
             raise ValueError(f"Unknown connection type: {connection_type}")
 

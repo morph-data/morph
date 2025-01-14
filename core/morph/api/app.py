@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 from typing import Annotated
@@ -20,10 +19,10 @@ from inertia import (
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from morph.api.cloud.utils import is_cloud
 from morph.api.error import ApiBaseError, InternalError
 from morph.api.handler import router
-from morph.constants import MorphConstant
+
+# TODO: clean build process & use mangum for lambda
 
 # configuration values
 build_required = os.getenv("MORPH_FRONT_BUILD", "false")
@@ -35,14 +34,6 @@ token = "dummy"
 environment = "development"
 entrypoint_filename = "main.tsx"
 template_dir = os.path.join(Path(__file__).resolve().parent, "templates", "development")
-
-if is_cloud():
-    with open(MorphConstant.MORPH_CLOUD_CONFIG_PATH, "r") as f:
-        domain = json.loads(f.read())["domain"]
-        front_url = f"https://live2-{domain}"
-        server_url = f"https://live-{domain}"
-    with open(MorphConstant.MORPH_CLOUD_CONFIG_PATH, "r") as f:
-        token = json.loads(f.read())["token"]
 
 if build_required == "true":
     environment = "production"

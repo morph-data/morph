@@ -72,23 +72,7 @@ def config(
 
 @cli.command("new")
 @click.argument("directory_name", required=False)
-@click.option(
-    "--github-url",
-    type=str,
-    help="Specify the github URL to clone the workspace template.",
-)
-@click.option(
-    "--directory",
-    type=str,
-    help="Specify the directory to clone the workspace template.",
-)
-@click.option(
-    "--branch",
-    type=str,
-    default="main",
-    show_default=True,
-    help="Specify the branch to clone. Defaults to 'main'.",
-)
+@params.project_id
 @click.pass_context
 @global_flags
 @requires.preflight
@@ -262,24 +246,3 @@ def init(
     task = InitTask(ctx.obj["flags"])
     results = task.run()
     return results, True
-
-
-@cli.command("build-frontend")
-@params.port
-@params.host
-@params.workdir
-@params.no_log
-@click.pass_context
-@global_flags
-@requires.preflight
-@requires.postflight
-def build_frontend(
-    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
-) -> Tuple[None, bool]:
-    """Build frontend with server."""
-    from morph.task.build import BuildTask
-
-    task = BuildTask(ctx.obj["flags"])
-    task.run()
-
-    return None, True

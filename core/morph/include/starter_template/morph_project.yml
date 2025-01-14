@@ -1,4 +1,4 @@
-default_connection: MORPH_BUILTIN_DB
+default_connection: DUCKDB
 output_paths:
 - /tmp/morph/{name}/{run_id}{ext()}
 result_cache_ttl: 0

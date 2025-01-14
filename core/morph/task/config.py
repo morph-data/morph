@@ -37,37 +37,16 @@ class ConfigTask(BaseTask):
         os.environ["MORPH_API_KEY"] = api_key
 
         client = MorphApiClient(MorphApiKeyClientImpl)
-        team = client.req.find_team()
-        if team.is_error():
+        check_secret = client.req.check_api_secret()
+        if check_secret.is_error():
             click.echo(
                 click.style(
-                    "Error: API key is invalid or does not have access to any team.",
+                    "Error: API key is invalid.",
                     fg="red",
                 )
             )
             exit(1)
         click.echo(click.style("✅ Verified", fg="green"))
-
-        click.echo(click.style("Please select workspace you want to use: "))
-
-        workspace_response = client.req.list_workspaces()
-        if workspace_response.is_error():
-            click.echo(
-                click.style("Error: Failed to retrieve workspaces list.", fg="red")
-            )
-            exit(1)
-        workspaces = workspace_response.json()["items"]
-        for i, workspace in enumerate(workspaces, start=1):
-            workspace_name = workspace["databaseName"]
-            click.echo(f"[{i}] {workspace_name}")
-
-        selected_index = click.prompt("Enter the number of your choice", type=int)
-        if 1 <= selected_index <= len(workspaces):
-            selected_workspace = workspaces[selected_index - 1]["databaseName"]
-            click.echo(f"You selected: {selected_workspace}")
-        else:
-            click.echo(click.style("Error: Invalid number selected.", fg="red"))
-            exit(1)
 
         # Load existing file or create new one if it doesn't exist
         config = configparser.ConfigParser()
@@ -81,7 +60,6 @@ class ConfigTask(BaseTask):
         else:
             click.echo("Credentials already exist. Updating...")
         config[profile_name] = {
-            "workspace_id": workspaces[selected_index - 1]["databaseId"],
             "api_key": api_key,
         }
 

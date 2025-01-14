@@ -6,7 +6,6 @@ import subprocess
 import sys
 import threading
 import time
-import webbrowser
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -14,14 +13,13 @@ import click
 import psutil
 from dotenv import dotenv_values, load_dotenv
 
-from morph.api.cloud.client import MorphApiClient, MorphApiKeyClientImpl
-from morph.api.cloud.types import EnvVarList
-from morph.api.cloud.utils import is_cloud
 from morph.cli.flags import Flags
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
 from morph.task.utils.morph import find_project_root_dir
 from morph.task.utils.timezone import TimezoneManager
+
+# TODO: change architecture depending on frontend changes
 
 
 class ApiTask(BaseTask):
@@ -36,27 +34,8 @@ class ApiTask(BaseTask):
 
         os.environ["MORPH_FRONT_BUILD"] = "true" if self.args.BUILD else "false"
 
-        if not is_cloud() and self.args.BUILD:
-            click.echo(
-                click.style(
-                    "Error: Build flag is only available on cloud, use 'morph build-frontend' instead.",
-                    fg="red",
-                    bg="yellow",
-                )
-            )
-            sys.exit(1)
-
         config_path = MorphConstant.MORPH_CRED_PATH
         has_config = os.path.exists(config_path)
-        if is_cloud() and not has_config:
-            click.echo(
-                click.style(
-                    f"Error: No credentials found in {config_path}.",
-                    fg="red",
-                    bg="yellow",
-                )
-            )
-            sys.exit(1)  # 1: General errors
 
         if has_config:
             # read credentials
@@ -72,31 +51,16 @@ class ApiTask(BaseTask):
                 )
                 sys.exit(1)  # 1: General errors
 
-            self.team_slug: str = config.get("default", "team_slug", fallback="")
-            self.app_url: str = config.get("default", "app_url", fallback="")
-            self.workspace_id: str = config.get(
-                "default", "workspace_id", fallback=""
-            ) or config.get("default", "database_id", fallback="")
             self.api_key: str = config.get("default", "api_key", fallback="")
-
-            os.environ["MORPH_WORKSPACE_ID"] = self.workspace_id
-            os.environ["MORPH_BASE_URL"] = self.app_url
-            os.environ["MORPH_TEAM_SLUG"] = self.team_slug
             os.environ["MORPH_API_KEY"] = self.api_key
 
-        if is_cloud():
-            client = MorphApiClient(MorphApiKeyClientImpl)
-            cloud_env_vars = client.req.list_env_vars().to_model(EnvVarList)
-            if cloud_env_vars:
-                for cloud_env_var in cloud_env_vars.items:
-                    os.environ[cloud_env_var.key] = cloud_env_var.value
-        else:
-            project_root = find_project_root_dir()
-            dotenv_path = os.path.join(project_root, ".env")
-            load_dotenv(dotenv_path)
-            env_vars = dotenv_values(dotenv_path)
-            for e_key, e_val in env_vars.items():
-                os.environ[e_key] = str(e_val)
+        project_root = find_project_root_dir()
+        dotenv_path = os.path.join(project_root, ".env")
+        load_dotenv(dotenv_path)
+        env_vars = dotenv_values(dotenv_path)
+        for e_key, e_val in env_vars.items():
+            os.environ[e_key] = str(e_val)
+
         desired_tz = os.getenv("TZ")
         if desired_tz is not None:
             tz_manager = TimezoneManager()
@@ -229,55 +193,39 @@ class ApiTask(BaseTask):
         current_dir = Path(__file__).resolve().parent
         server_script_path = os.path.join(current_dir, "server.py")
 
-        if is_cloud():
-            self._start_frontend()
+        signal.signal(signal.SIGINT, self._signal_handler)
+        try:
+            frontend_dir = os.path.join(Path(__file__).resolve().parents[1], "frontend")
 
-            subprocess.Popen(
-                [
-                    sys.executable,
-                    server_script_path,
-                ]
-                + sys.argv[1:],
-                stdout=None,
-                stderr=None,
+            self._run_process(
+                [sys.executable, server_script_path] + sys.argv[1:],
+                log=self.is_debug,
             )
-        else:
-            signal.signal(signal.SIGINT, self._signal_handler)
-            try:
-                frontend_dir = os.path.join(
-                    Path(__file__).resolve().parents[1], "frontend"
-                )
 
-                self._run_process(
-                    [sys.executable, server_script_path] + sys.argv[1:],
-                    log=self.is_debug,
+            click.echo(
+                click.style(
+                    "✅ Done server setup",
+                    fg="green",
                 )
-
-                click.echo(
-                    click.style(
-                        "✅ Done server setup",
-                        fg="green",
-                    )
+            )
+            self._run_process(
+                ["npm", "run", "dev"],
+                cwd=frontend_dir,
+                log=False,
+            )
+            running_url = f"http://localhost:{self.args.PORT}"
+            click.echo(
+                click.style(
+                    f"\nMorph is ready!🚀\n\n ->  Local: {running_url}\n",
+                    fg="yellow",
                 )
-                self._run_process(
-                    ["npm", "run", "dev"],
-                    cwd=frontend_dir,
-                    log=False,
-                )
-                running_url = f"http://localhost:{self.args.PORT}"
-                click.echo(
-                    click.style(
-                        f"\nMorph is ready!🚀\n\n ->  Local: {running_url}\n",
-                        fg="yellow",
-                    )
-                )
-                if not is_cloud():
-                    webbrowser.open(running_url)
-                signal.pause()
-            except KeyboardInterrupt:
-                self._signal_handler(None, None)
+            )
+            signal.pause()
+        except KeyboardInterrupt:
+            self._signal_handler(None, None)
 
     def _setup_frontend(self) -> None:
+        # TODO: remove these codes
         click.echo(
             click.style(
                 "Starting server ...",
