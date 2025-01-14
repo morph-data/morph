@@ -70,14 +70,14 @@ def run_file_with_type_service(
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
     resource = context.search_meta_object_by_name(input.name)
     if resource is None:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
     filepath = str(resource.id).split(":")[0]
 
@@ -205,14 +205,14 @@ def run_file_service(input: RunFileService) -> SuccessResponse:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
     resource = context.search_meta_object_by_name(input.name)
     if resource is None:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
     db_manager = SqliteDBManager(project_root)
@@ -282,7 +282,7 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
     with click.Context(click.Command(name="")) as ctx:
