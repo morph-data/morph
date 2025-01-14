@@ -191,6 +191,23 @@ def clean(
     return None, True
 
 
+@cli.command("deploy")
+@params.verbose
+@click.pass_context
+@global_flags
+@requires.preflight
+@requires.postflight
+def deploy(
+    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
+) -> Tuple[Union[Dict[str, Union[str, int, bool]], None], bool]:
+    """Deploy morph project to the cloud."""
+    from morph.task.deploy import DeployTask
+
+    task = DeployTask(ctx.obj["flags"])
+    results = task.run()
+    return results, True
+
+
 @cli.command("sync")
 @params.verbose
 @click.pass_context
