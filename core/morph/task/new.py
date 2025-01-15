@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 import click
+from virtualenv.seed.wheels import pip_wheel_env_run
 
 from morph.cli.flags import Flags
 from morph.config.project import default_initial_project, load_project, save_project

@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, cast
 from jinja2 import Environment, nodes
 from pydantic import BaseModel
 
-from morph.config.project import MorphProject
+from morph.config.project import MorphProject, default_output_paths
 from morph.constants import MorphConstant
 
 from .errors import MorphFunctionLoadError, MorphFunctionLoadErrorCategory
@@ -155,27 +155,7 @@ def _import_sql_file(
         if name is None:
             name = file.stem
         if output_paths is None:
-            if project and project.output_paths and len(project.output_paths) > 0:
-                project_output_paths: List[str] = []
-                for project_output_path in project.output_paths:
-                    if (
-                        Path(project_output_path).is_dir()
-                        and "ext()" not in project_output_path
-                    ):
-                        project_output_paths.append(
-                            f"{project_output_path}/{{name}}/{{run_id}}{{ext()}}"
-                        )
-                    else:
-                        project_output_paths.append(project_output_path)
-                output_paths = (
-                    project_output_paths
-                    if len(project_output_paths) > 0
-                    else output_paths
-                )
-            else:
-                output_paths = [
-                    f"{MorphConstant.TMP_MORPH_DIR}/{{name}}/{{run_id}}{{ext()}}"
-                ]
+            output_paths = default_output_paths()
         if output_type is None:
             output_type = "dataframe"
         if result_cache_ttl is None:
