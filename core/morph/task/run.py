@@ -49,6 +49,10 @@ class RunTask(BaseTask):
     def __init__(self, args: Flags, mode: Optional[Literal["cli", "api"]] = "cli"):
         super().__init__(args)
 
+        # class state
+        self.final_state: Optional[str] = None
+        self.error: Optional[str] = None
+
         # parse arguments
         filename_or_alias: str = os.path.normpath(args.FILENAME)
         self.run_id: str = self.args.RUN_ID or f"{int(time.time() * 1000)}"
@@ -191,19 +195,20 @@ class RunTask(BaseTask):
 
     def run(self) -> Any:
         if self.ext != ".sql" and self.ext != ".py":
-            text = "Invalid file type. Please specify a .sql or .py file."
-            self.logger.error(text)
+            self.error = "Invalid file type. Please specify a .sql or .py file."
+            self.logger.error(self.error)
+            self.final_state = RunStatus.FAILED.value
             finalize_run(
                 self.project,
                 self.resource,
                 self.cell_alias,
-                RunStatus.FAILED.value,
+                self.final_state,
                 None,
                 self.logger,
                 self.run_id,
                 CliError(
                     type="general",
-                    details=text,
+                    details=self.error,
                 ),
             )
             return
@@ -238,13 +243,15 @@ class RunTask(BaseTask):
                         else str(e)
                     )
                     text = f"An error occurred while running the file 💥: {error_txt}"
-                self.logger.error(text)
-                click.echo(click.style(text, fg="red"))
+                self.error = text
+                self.logger.error(self.error)
+                click.echo(click.style(self.error, fg="red"))
+                self.final_state = RunStatus.FAILED.value
                 finalize_run(
                     self.project,
                     self.resource,
                     cell,
-                    RunStatus.FAILED.value,
+                    self.final_state,
                     None,
                     self.logger,
                     self.run_id,
@@ -285,11 +292,12 @@ class RunTask(BaseTask):
                         None,
                     )
             else:
+                self.final_state = RunStatus.DONE.value
                 finalize_run(
                     self.project,
                     self.resource,
                     cell,
-                    RunStatus.DONE.value,
+                    self.final_state,
                     transform_output(self.resource, output.result),
                     self.logger,
                     self.run_id,

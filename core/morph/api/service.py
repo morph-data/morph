@@ -1,4 +1,3 @@
-import ast
 import asyncio
 import io
 import json
@@ -35,7 +34,7 @@ from morph.task.run import RunTask
 from morph.task.utils.morph import find_project_root_dir
 from morph.task.utils.run_backend.errors import MorphFunctionLoadError
 from morph.task.utils.run_backend.state import MorphGlobalContext
-from morph.task.utils.sqlite import SqliteDBManager
+from morph.task.utils.run_backend.types import RunStatus
 
 logger = logging.getLogger("uvicorn")
 
@@ -66,9 +65,6 @@ def run_file_with_type_service(
         )
     filepath = str(resource.id).split(":")[0]
 
-    db_manager = SqliteDBManager(project_root)
-    db_manager.initialize_database()
-
     if input.type == "html":
         filename = str(os.path.basename(filepath))
         if filename.endswith(".vg.json"):
@@ -95,20 +91,10 @@ def run_file_with_type_service(
             str(e),
         )
 
-    run_results = db_manager.get_run_records_by_run_id(task.run_id)
-    run_result = next(
-        (result for result in run_results if result["cell_alias"] == input.name), None
-    )
-    if run_result is None:
-        raise WarningError(
-            ErrorCode.ExecutionError,
-            ErrorMessage.ExecutionErrorMessage["executionFailed"],
-            "run result not found",
-        )
-    elif run_result["status"] == "failed":
-        if run_result["error"] is not None:
+    if task.final_state != RunStatus.DONE.value:
+        if task.error is not None:
             try:
-                error = json.loads(run_result["error"])["details"]
+                error = json.loads(task.error)
             except Exception:  # noqa
                 raise WarningError(
                     ErrorCode.ExecutionError,
@@ -126,7 +112,7 @@ def run_file_with_type_service(
             ErrorMessage.ExecutionErrorMessage["executionFailed"],
         )
     try:
-        output_paths = ast.literal_eval(run_result["outputs"])
+        output_paths = default_output_paths()
     except Exception:  # noqa
         raise WarningError(
             ErrorCode.ExecutionError,
@@ -200,9 +186,6 @@ def run_file_service(input: RunFileService) -> SuccessResponse:
             f"Alias not found {input.name}",
         )
 
-    db_manager = SqliteDBManager(project_root)
-    db_manager.initialize_database()
-
     with click.Context(click.Command(name="")) as ctx:
         run_id = input.run_id if input.run_id else f"{int(time.time() * 1000)}"
         ctx.params["FILENAME"] = input.name
@@ -220,20 +203,10 @@ def run_file_service(input: RunFileService) -> SuccessResponse:
             str(e),
         )
 
-    run_results = db_manager.get_run_records_by_run_id(task.run_id)
-    run_result = next(
-        (result for result in run_results if result["cell_alias"] == input.name), None
-    )
-    if run_result is None:
-        raise WarningError(
-            ErrorCode.ExecutionError,
-            ErrorMessage.ExecutionErrorMessage["executionFailed"],
-            "run result not found",
-        )
-    elif run_result["status"] == "failed":
-        if run_result["error"] is not None:
+    if task.final_state != RunStatus.DONE.value:
+        if task.error is not None:
             try:
-                error = json.loads(run_result["error"])["details"]
+                error = json.loads(task.error)
             except Exception:  # noqa
                 raise WarningError(
                     ErrorCode.ExecutionError,
