@@ -1,19 +1,21 @@
-# deploy.py
 import hashlib
 import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import List
 
 import click
 import requests
 from tqdm import tqdm
 
 from morph.api.cloud.client import MorphApiKeyClientImpl
+from morph.api.cloud.types import EnvVarObject
 from morph.cli.flags import Flags
 from morph.config.project import load_project
 from morph.task.base import BaseTask
+from morph.task.utils.file_upload import FileWithProgress
 from morph.task.utils.morph import find_project_root_dir
 
 
@@ -82,6 +84,18 @@ class DeployTask(BaseTask):
         # Verify dependencies
         self._verify_dependencies()
 
+        # Initialize the Morph API client
+        try:
+            self.client = MorphApiKeyClientImpl()
+        except ValueError as e:
+            click.echo(click.style(f"Error: {str(e)}", fg="red"))
+            sys.exit(1)
+
+        # Verify environment variables
+        self.env_file = os.path.join(self.project_root, ".env")
+        if os.path.exists(self.env_file):
+            self._verify_environment_variables()
+
     def run(self):
         """
         Main entry point for the morph deploy task.
@@ -115,16 +129,9 @@ class DeployTask(BaseTask):
 
         # 5. Call the Morph API to initialize a deployment and get the pre-signed URL
         try:
-            client = MorphApiKeyClientImpl()
-        except ValueError as e:
-            click.echo(click.style(f"Error: {str(e)}", fg="red"))
-            sys.exit(1)
-
-        # Extract presigned URL and deployment ID from the response
-        try:
-            initialize_resp = client.initiate_deployment(
-                project_id=client.project_id,
-                image_build_log="Docker build logs here",  # TODO: capture Docker build logs
+            initialize_resp = self.client.initiate_deployment(
+                project_id=self.client.project_id,
+                image_build_log="",  # TODO: capture Docker build logs
                 image_checksum=image_checksum,
             )
         except Exception as e:
@@ -165,7 +172,7 @@ class DeployTask(BaseTask):
 
         # 7. Execute the deployment
         try:
-            execute_resp = client.execute_deployment(user_function_deployment_id)
+            execute_resp = self.client.execute_deployment(user_function_deployment_id)
         except Exception as e:
             click.echo(click.style(f"Error executing deployment: {str(e)}", fg="red"))
             sys.exit(1)
@@ -186,12 +193,15 @@ class DeployTask(BaseTask):
 
         click.echo(click.style(f"Deployment status: {status}", fg="blue"))
 
+        # 8. Override environment variables
+        self._override_env_variables()
+
         click.echo(click.style("Deployment completed successfully! 🎉", fg="green"))
 
     # --------------------------------------------------------
     # Internal methods
     # --------------------------------------------------------
-    def _verify_dependencies(self):
+    def _verify_dependencies(self) -> None:
         """
         Checks if the required dependency files exist based on the package manager.
         """
@@ -226,6 +236,48 @@ class DeployTask(BaseTask):
                     fg="red",
                 )
             )
+            sys.exit(1)
+
+    def _verify_environment_variables(self) -> None:
+        # Check environment variables in the Morph Cloud
+        try:
+            env_vars_resp = self.client.list_env_vars()
+        except Exception as e:
+            click.echo(
+                click.style(f"Error fetching environment variables: {str(e)}", fg="red")
+            )
+            sys.exit(1)
+
+        if env_vars_resp.is_error():
+            click.echo(
+                click.style(
+                    f"Error fetching environment variables: {env_vars_resp.text}",
+                    fg="red",
+                )
+            )
+            sys.exit(1)
+
+        items = env_vars_resp.json().get("items")
+        if not items:
+            return
+
+        # TODO: Remove debug print
+        print("==================== FOR DEBUGGING ====================")
+        print(items)
+
+        click.echo(
+            click.style(
+                "Warning: .env file detected! This command will override environment variables in the Morph Cloud with local .env file.",
+                fg="yellow",
+            )
+        )
+        if (
+            input(
+                "Are you sure you want to continue? (Y/n): ",
+            )
+            != "Y"
+        ):
+            click.echo(click.style("Aborted!"))
             sys.exit(1)
 
     def _build_frontend(self):
@@ -328,32 +380,32 @@ class DeployTask(BaseTask):
     @staticmethod
     def _upload_image_to_presigned_url(presigned_url: str, file_path: str) -> None:
         """
-        Uploads the local .tar image to the specified pre-signed URL via PUT.
-        Uses a progress bar to show upload progress.
+        Uploads the specified file to the S3 presigned URL.
+        @param presigned_url:
+        @param file_path:
+        @return:
         """
         file_size = os.path.getsize(file_path)
         click.echo(
-            click.style("Uploading .tar image to the presigned URL...", fg="blue")
+            click.style(
+                f"Uploading .tar image ({file_size / (1024 * 1024):.2f} MB) to the presigned URL...",
+                fg="blue",
+            )
         )
 
-        with open(file_path, "rb") as f, tqdm(
-            total=file_size,
-            unit="B",
-            unit_scale=True,
-            desc="Uploading",
-        ) as pbar:
-            # Stream the file in chunks
-            for chunk in iter(lambda: f.read(4096), b""):
+        with tqdm(total=file_size, unit="B", unit_scale=True, desc="Uploading") as pbar:
+            with FileWithProgress(file_path, pbar) as fwp:
+                headers = {
+                    "Content-Type": "application/octet-stream",
+                    "Content-Length": str(file_size),
+                }
                 response = requests.put(
                     presigned_url,
-                    data=chunk,
-                    headers={"Content-Type": "application/octet-stream"},
-                    stream=True,
+                    data=fwp,
+                    headers=headers,
                 )
-                # Update the progress bar with the size of the chunk
-                pbar.update(len(chunk))
 
-        if response.status_code not in (200, 201):
+        if not (200 <= response.status_code < 300):
             click.echo(
                 click.style(
                     f"Failed to upload image. Status code: {response.status_code}, Response: {response.text}",
@@ -363,3 +415,39 @@ class DeployTask(BaseTask):
             sys.exit(1)
 
         click.echo(click.style("Upload completed successfully.", fg="green"))
+
+    def _override_env_variables(self) -> None:
+        """
+        Overrides the environment variables in the Morph Cloud with the local .env file.
+        @param self:
+        @return:
+        """
+        env_vars: List[EnvVarObject] = []
+        with open(self.env_file, "r") as f:
+            for line in f:
+                if not line.strip() or line.startswith("#"):
+                    continue
+                key, value = line.strip().split("=", 1)
+                env_vars.append(EnvVarObject(key=key, value=value))
+
+        try:
+            override_res = self.client.override_env_vars(env_vars=env_vars)
+        except Exception as e:
+            click.echo("")
+            click.echo(
+                click.style(
+                    f"Error overriding environment variables: {str(e)}", fg="red"
+                )
+            )
+            sys.exit(1)
+
+        if override_res.is_error():
+            click.echo("")
+            click.echo(
+                click.style(
+                    f"Waring: Failed to override environment variables. {override_res.reason}",
+                    fg="yellow",
+                )
+            )
+        else:
+            click.echo(click.style(" done!", fg="green"))
