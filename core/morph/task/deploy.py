@@ -1,4 +1,5 @@
-import gzip
+# deploy.py
+import hashlib
 import os
 import shutil
 import subprocess
@@ -6,8 +7,10 @@ import sys
 from pathlib import Path
 
 import click
+import requests
 from tqdm import tqdm
 
+from morph.api.cloud.client import MorphApiKeyClientImpl
 from morph.cli.flags import Flags
 from morph.config.project import load_project
 from morph.task.base import BaseTask
@@ -21,29 +24,30 @@ class DeployTask(BaseTask):
         self.no_cache = args.NO_CACHE
         self.is_verbose = args.VERBOSE
 
+        # Attempt to find the project root
         try:
             self.project_root = find_project_root_dir(os.getcwd())
         except FileNotFoundError as e:
-            click.echo(click.style(f"Error: {str(e)}", fg="red", bg="yellow"))
+            click.echo(click.style(f"Error: {str(e)}", fg="red"))
             sys.exit(1)
 
+        # Load morph_project.yml or equivalent
         project = load_project(self.project_root)
         if not project:
             click.echo(click.style("Project configuration not found.", fg="red"))
             sys.exit(1)
         self.package_manager = project.package_manager
 
-        # Ensure the Dockerfile exists
+        # Check Dockerfile existence
         self.dockerfile = os.path.join(self.project_root, "Dockerfile")
         if not os.path.exists(self.dockerfile):
             click.echo(click.style(f"Error: {self.dockerfile} not found", fg="red"))
             sys.exit(1)
 
+        # Check Docker availability
         try:
-            # Check if Docker CLI is installed
             click.echo(click.style("Checking Docker daemon status...", fg="blue"))
             subprocess.run(["docker", "--version"], stdout=subprocess.PIPE, check=True)
-            # Check if Docker daemon is running
             subprocess.run(["docker", "info"], stdout=subprocess.PIPE, check=True)
         except subprocess.CalledProcessError:
             click.echo(
@@ -69,18 +73,18 @@ class DeployTask(BaseTask):
         self.frontend_dir = os.path.join(self.project_root, ".morph/frontend")
         self.dist_dir = os.path.join(self.frontend_dir, "dist")
 
-        # Docker settings
+        # Docker image settings: use .tar instead
         self.image_name = f"{os.path.basename(self.project_root)}:latest"
-        self.output_tar_gz = os.path.join(
-            self.project_root, f".morph/{os.path.basename(self.project_root)}.tar.gz"
+        self.output_tar = os.path.join(
+            self.project_root, f".morph/{os.path.basename(self.project_root)}.tar"
         )
 
-        # Check dependency files
-        self._check_dependencies()
+        # Verify dependencies
+        self._verify_dependencies()
 
     def run(self):
         """
-        Entry point for running the morph deploy task.
+        Main entry point for the morph deploy task.
         """
         click.echo(click.style("Initiating deployment sequence...", fg="blue"))
 
@@ -94,33 +98,77 @@ class DeployTask(BaseTask):
             sys.exit(1)
         shutil.copy2(entrypoint_file, os.path.join(self.project_root, ".morph/main.py"))
 
-        # Build the frontend, Docker image, and save to tar.gz
+        # 1. Build the frontend
         self._build_frontend()
-        self._build_docker_image()
-        self._tarball_docker_image()
 
-        # TODO: Implement deployment sequence
+        # 2. Build the Docker image
+        click.echo(click.style("Building Docker image...", fg="blue"))
+        self._build_docker_image()
+
+        # 3. Save Docker image as .tar
+        click.echo(click.style("Saving Docker image as .tar...", fg="blue"))
+        self._save_docker_image()
+
+        # 4. Compute the checksum of the .tar file
+        image_checksum = self._compute_file_sha256(self.output_tar)
+        click.echo(click.style(f"Computed checksum: {image_checksum}", fg="blue"))
+
+        # 5. Call the Morph API to create a deployment and get the pre-signed URL
+        try:
+            client = MorphApiKeyClientImpl()
+        except ValueError as e:
+            click.echo(click.style(f"Error: {str(e)}", fg="red"))
+            sys.exit(1)
+        create_resp = client.create_deployment(
+            project_id=client.project_id,
+            image_build_log="(Optional) Docker build logs here",
+            image_checksum=image_checksum,
+        )
+
+        # Extract presigned URL and deployment ID from the response
+        presigned_url = create_resp.data.get("imageLocation")
+        if not presigned_url:
+            click.echo(
+                click.style("Error: No 'imageLocation' in the response.", fg="red")
+            )
+            sys.exit(1)
+
+        user_function_deployment_id = create_resp.data.get("userFunctionDeploymentId")
+        if not user_function_deployment_id:
+            click.echo(
+                click.style(
+                    "Error: No 'userFunctionDeploymentId' in the response.", fg="red"
+                )
+            )
+            sys.exit(1)
+
+        # 6. Upload the tar to the pre-signed URL
+        self._upload_image_to_presigned_url(presigned_url, self.output_tar)
+
+        # 7. Finalize the deployment
+        finalize_resp = client.finalize_deployment(user_function_deployment_id)
+        status = finalize_resp.data.get("status", "UNKNOWN")
+        click.echo(click.style(f"Deployment status: {status}", fg="blue"))
 
         click.echo(click.style("Deployment completed successfully! 🎉", fg="green"))
 
-    def _check_dependencies(self):
+    # --------------------------------------------------------
+    # Internal methods
+    # --------------------------------------------------------
+    def _verify_dependencies(self):
         """
-        Check if required dependency files exist based on the package manager.
+        Checks if the required dependency files exist based on the package manager.
         """
-
         if self.package_manager == "pip":
             requirements_file = os.path.join(self.project_root, "requirements.txt")
             if not os.path.exists(requirements_file):
                 click.echo(
                     click.style(
-                        "Error: The file 'requirements.txt' is missing.\n"
-                        "This file is required because the project is configured to use 'pip' as the package manager.\n"
-                        "Please create a 'requirements.txt' file in the project root directory and list the Python dependencies.",
+                        "Error: 'requirements.txt' is missing. Please create it.",
                         fg="red",
                     )
                 )
                 sys.exit(1)
-
         elif self.package_manager == "poetry":
             poetry_files = [
                 os.path.join(self.project_root, "pyproject.toml"),
@@ -130,26 +178,15 @@ class DeployTask(BaseTask):
             if missing_files:
                 click.echo(
                     click.style(
-                        "Error: Missing required Poetry files.\n"
-                        "The following file(s) are missing:\n"
-                        f"  - {', '.join(missing_files)}\n"
-                        "These files are necessary because the project is configured to use 'poetry' as the package manager.\n"
-                        "To fix this:\n"
-                        "1. Ensure that 'pyproject.toml' defines your project dependencies.\n"
-                        "2. Run 'poetry lock' to generate the 'poetry.lock' file.",
+                        f"Error: Missing Poetry files: {missing_files}",
                         fg="red",
                     )
                 )
                 sys.exit(1)
-
         else:
             click.echo(
                 click.style(
-                    f"Error: Unknown package manager '{self.package_manager}'.\n"
-                    "Please check the 'package_manager' setting in your project configuration.\n"
-                    "Valid options are:\n"
-                    "  - pip\n"
-                    "  - poetry",
+                    f"Error: Unknown package manager '{self.package_manager}'.",
                     fg="red",
                 )
             )
@@ -157,24 +194,22 @@ class DeployTask(BaseTask):
 
     def _build_frontend(self):
         """
-        Build the frontend using npm.
+        Builds the frontend using npm.
         """
         try:
             click.echo(click.style("Building frontend...", fg="blue"))
-            # Install dependencies
             subprocess.run(["npm", "install"], cwd=self.frontend_src_dir, check=True)
-            # Run the build script
             subprocess.run(
                 ["npm", "run", "build"], cwd=self.frontend_src_dir, check=True
             )
-            # Copy build artifact to .morph/frontend
+
             if os.path.exists(self.frontend_dir):
                 shutil.rmtree(self.frontend_dir)
             shutil.copytree(self.frontend_src_dir, self.frontend_dir)
-            # Ensure the dist directory exists after building
+
             if not os.path.exists(self.dist_dir):
                 raise FileNotFoundError(
-                    "Frontend build failed: 'dist' directory not found."
+                    "Frontend build failed: no 'dist' directory found."
                 )
             click.echo(click.style("Frontend built successfully.", fg="green"))
         except subprocess.CalledProcessError as e:
@@ -186,12 +221,9 @@ class DeployTask(BaseTask):
 
     def _build_docker_image(self):
         """
-        Build the Docker image.
+        Builds the Docker image using the local Dockerfile.
         """
         try:
-            click.echo(
-                click.style(f"Building Docker image '{self.image_name}'...", fg="blue")
-            )
             docker_build_cmd = [
                 "docker",
                 "build",
@@ -213,78 +245,30 @@ class DeployTask(BaseTask):
             click.echo(click.style(f"Error building Docker image: {str(e)}", fg="red"))
             sys.exit(1)
 
-    def _tarball_docker_image(self):
+    def _save_docker_image(self):
         """
-        Save the Docker image as a tar.gz file, with a progress bar and percentage display.
+        Saves the Docker image as a .tar file without compression.
         """
         try:
-            # Ensure the output directory exists
-            output_dir = os.path.dirname(self.output_tar_gz)
+            output_dir = os.path.dirname(self.output_tar)
             os.makedirs(output_dir, exist_ok=True)
 
-            # Save Docker image and gzip it
+            if os.path.exists(self.output_tar):
+                os.remove(self.output_tar)  # remove any existing file
+
+            # Docker save command with -o option
+            subprocess.run(
+                ["docker", "save", "-o", self.output_tar, self.image_name],
+                check=True,
+            )
+            if not os.path.exists(self.output_tar):
+                raise FileNotFoundError("Docker save failed to produce the .tar file.")
+
+            file_size_mb = os.path.getsize(self.output_tar) / (1024 * 1024)
             click.echo(
                 click.style(
-                    f"Saving Docker image as tar.gz to '{self.output_tar_gz}'...",
+                    f"Docker image saved as '{self.output_tar}' ({file_size_mb:.2f} MB).",
                     fg="blue",
-                )
-            )
-
-            # First, save the Docker image as a tar stream and get the total size
-            docker_save = subprocess.Popen(
-                ["docker", "save", self.image_name],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-
-            if docker_save.stdout is None:
-                raise RuntimeError("Docker save process did not produce any output.")
-
-            # Get an approximate size of the tarball by reading its header
-            total_size = 0
-            header_size = 512  # Tar block size
-            for _ in range(20):  # Read the first 20 blocks to estimate size
-                chunk = docker_save.stdout.read(header_size)
-                if not chunk:
-                    break
-                total_size += len(chunk)
-
-            # Estimate total size if not already determined
-            total_size_mb = (
-                total_size / (1024 * 1024) if total_size else 100
-            )  # Default to 100MB for display
-
-            # Use gzip to compress the tar stream
-            with open(self.output_tar_gz, "wb") as tar_gz:
-                with gzip.GzipFile(fileobj=tar_gz, mode="wb") as gzip_file:
-                    buffer_size = 1024 * 1024  # 1 MB buffer size
-                    with tqdm(
-                        total=total_size_mb,
-                        unit="MB",
-                        unit_scale=True,
-                        desc="Compressing",
-                    ) as pbar:
-                        while True:
-                            chunk = docker_save.stdout.read(buffer_size)
-                            if not chunk:
-                                break
-                            gzip_file.write(chunk)
-                            pbar.update(len(chunk) / (1024 * 1024))
-
-                    # Ensure the docker save process completes successfully
-                    docker_save.wait()
-                    if docker_save.returncode != 0:
-                        stderr = (
-                            docker_save.stderr.read().decode("utf-8")
-                            if docker_save.stderr
-                            else ""
-                        )
-                        raise RuntimeError(f"Docker save failed: {stderr.strip()}")
-
-            click.echo(
-                click.style(
-                    f"Docker image successfully saved as '{self.output_tar_gz}'.",
-                    fg="green",
                 )
             )
         except subprocess.CalledProcessError as e:
@@ -293,3 +277,49 @@ class DeployTask(BaseTask):
         except Exception as e:
             click.echo(click.style(f"Unexpected error: {str(e)}", fg="red"))
             sys.exit(1)
+
+    @staticmethod
+    def _compute_file_sha256(file_path: str) -> str:
+        """
+        Computes and returns the SHA256 checksum of the specified file.
+        """
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+
+    @staticmethod
+    def _upload_image_to_presigned_url(presigned_url: str, file_path: str):
+        """
+        Uploads the local .tar image to the specified pre-signed URL via PUT.
+        Uses a progress bar to show upload progress.
+        """
+        file_size = os.path.getsize(file_path)
+        click.echo(
+            click.style("Uploading .tar image to the presigned URL...", fg="blue")
+        )
+
+        with open(file_path, "rb") as f, tqdm(
+            total=file_size,
+            unit="B",
+            unit_scale=True,
+            desc="Uploading",
+        ) as pbar:
+            response = requests.put(
+                presigned_url,
+                data=f,
+                headers={"Content-Type": "application/octet-stream"},
+            )
+            pbar.update(file_size)
+
+        if response.status_code not in (200, 201):
+            click.echo(
+                click.style(
+                    f"Failed to upload image. Status code: {response.status_code}, Response: {response.text}",
+                    fg="red",
+                )
+            )
+            sys.exit(1)
+
+        click.echo(click.style("Upload completed successfully.", fg="green"))
