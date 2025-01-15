@@ -100,7 +100,7 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
         path = "api-secret/check"
         return self.request(method="GET", path=path)
 
-    def create_deployment(
+    def initiate_deployment(
         self, project_id: str, image_build_log: str, image_checksum: str
     ) -> MorphClientResponse:
         path = "deployment"
@@ -112,7 +112,7 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
 
         return self.request(method="POST", path=path, data=body)
 
-    def finalize_deployment(
+    def execute_deployment(
         self, user_function_deployment_id: str
     ) -> MorphClientResponse:
         path = f"deployment/{user_function_deployment_id}"

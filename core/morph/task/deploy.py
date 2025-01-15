@@ -113,27 +113,45 @@ class DeployTask(BaseTask):
         image_checksum = self._compute_file_sha256(self.output_tar)
         click.echo(click.style(f"Computed checksum: {image_checksum}", fg="blue"))
 
-        # 5. Call the Morph API to create a deployment and get the pre-signed URL
+        # 5. Call the Morph API to initialize a deployment and get the pre-signed URL
         try:
             client = MorphApiKeyClientImpl()
         except ValueError as e:
             click.echo(click.style(f"Error: {str(e)}", fg="red"))
             sys.exit(1)
-        create_resp = client.create_deployment(
-            project_id=client.project_id,
-            image_build_log="(Optional) Docker build logs here",
-            image_checksum=image_checksum,
-        )
 
         # Extract presigned URL and deployment ID from the response
-        presigned_url = create_resp.data.get("imageLocation")
+        try:
+            initialize_resp = client.initiate_deployment(
+                project_id=client.project_id,
+                image_build_log="Docker build logs here",  # TODO: capture Docker build logs
+                image_checksum=image_checksum,
+            )
+        except Exception as e:
+            click.echo(
+                click.style(f"Error initializing deployment: {str(e)}", fg="red")
+            )
+            sys.exit(1)
+
+        if initialize_resp.is_error():
+            click.echo(
+                click.style(
+                    f"Error initializing deployment: {initialize_resp.text}",
+                    fg="red",
+                )
+            )
+            sys.exit(1)
+
+        presigned_url = initialize_resp.json().get("imageLocation")
         if not presigned_url:
             click.echo(
                 click.style("Error: No 'imageLocation' in the response.", fg="red")
             )
             sys.exit(1)
 
-        user_function_deployment_id = create_resp.data.get("userFunctionDeploymentId")
+        user_function_deployment_id = initialize_resp.json().get(
+            "userFunctionDeploymentId"
+        )
         if not user_function_deployment_id:
             click.echo(
                 click.style(
@@ -145,9 +163,27 @@ class DeployTask(BaseTask):
         # 6. Upload the tar to the pre-signed URL
         self._upload_image_to_presigned_url(presigned_url, self.output_tar)
 
-        # 7. Finalize the deployment
-        finalize_resp = client.finalize_deployment(user_function_deployment_id)
-        status = finalize_resp.data.get("status", "UNKNOWN")
+        # 7. Execute the deployment
+        try:
+            execute_resp = client.execute_deployment(user_function_deployment_id)
+        except Exception as e:
+            click.echo(click.style(f"Error executing deployment: {str(e)}", fg="red"))
+            sys.exit(1)
+
+        if execute_resp.is_error():
+            click.echo(
+                click.style(
+                    f"Error executing deployment: {execute_resp.text}",
+                    fg="red",
+                )
+            )
+            sys.exit(1)
+
+        status = execute_resp.json().get("status")
+        if not status:
+            click.echo(click.style("Error: No 'status' in the response.", fg="red"))
+            sys.exit(1)
+
         click.echo(click.style(f"Deployment status: {status}", fg="blue"))
 
         click.echo(click.style("Deployment completed successfully! 🎉", fg="green"))
@@ -290,7 +326,7 @@ class DeployTask(BaseTask):
         return sha256_hash.hexdigest()
 
     @staticmethod
-    def _upload_image_to_presigned_url(presigned_url: str, file_path: str):
+    def _upload_image_to_presigned_url(presigned_url: str, file_path: str) -> None:
         """
         Uploads the local .tar image to the specified pre-signed URL via PUT.
         Uses a progress bar to show upload progress.
@@ -306,12 +342,16 @@ class DeployTask(BaseTask):
             unit_scale=True,
             desc="Uploading",
         ) as pbar:
-            response = requests.put(
-                presigned_url,
-                data=f,
-                headers={"Content-Type": "application/octet-stream"},
-            )
-            pbar.update(file_size)
+            # Stream the file in chunks
+            for chunk in iter(lambda: f.read(4096), b""):
+                response = requests.put(
+                    presigned_url,
+                    data=chunk,
+                    headers={"Content-Type": "application/octet-stream"},
+                    stream=True,
+                )
+                # Update the progress bar with the size of the chunk
+                pbar.update(len(chunk))
 
         if response.status_code not in (200, 201):
             click.echo(
