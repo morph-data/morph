@@ -36,7 +36,6 @@ def func(
     title: str | None = None,
     schemas: list[MorphKnowledgeMetaObjectSchema] | None = None,
     terms: list[MorphKnowledgeMetaObjectGlossaryTerm] | None = None,
-    output_paths: list[str] | None = None,
     output_type: Optional[
         Literal["dataframe", "csv", "visualization", "markdown", "json"]
     ] = None,

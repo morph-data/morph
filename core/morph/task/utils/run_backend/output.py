@@ -22,7 +22,7 @@ from morph_lib.types import (
 )
 from pydantic import BaseModel
 
-from morph.config.project import MorphProject
+from morph.config.project import MorphProject, default_output_paths
 from morph.constants import MorphConstant
 from morph.task.utils.logging import (
     redirect_stdout_to_logger,
@@ -394,22 +394,7 @@ def _infer_output_type(output: Any) -> Optional[str]:
 def _get_output_paths(
     project: Optional[MorphProject], resource: MorphFunctionMetaObject
 ) -> List[str]:
-    output_paths: List[str] = []
-    if project and project.output_paths and len(project.output_paths) > 0:
-        project_output_paths: List[str] = []
-        for project_output_path in project.output_paths:
-            if (
-                os.path.isdir(project_output_path)
-                and "ext()" not in project_output_path
-            ):
-                project_output_paths.append(
-                    f"{project_output_path}/{{name}}/{{run_id}}{{ext()}}"
-                )
-            else:
-                project_output_paths.append(project_output_path)
-        output_paths = (
-            project_output_paths if len(project_output_paths) > 0 else output_paths
-        )
+    output_paths = default_output_paths()
     if resource.output_paths and len(resource.output_paths) > 0:
         output_paths = cast(list, resource.output_paths)
     output_type = resource.output_type if resource.output_type else None
