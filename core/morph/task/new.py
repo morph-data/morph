@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional
 
 import click
-from virtualenv.seed.wheels import pip_wheel_env_run
 
 from morph.cli.flags import Flags
 from morph.config.project import default_initial_project, load_project, save_project
@@ -12,7 +11,6 @@ from morph.constants import MorphConstant
 from morph.task.base import BaseTask
 from morph.task.utils.connection import ConnectionYaml
 from morph.task.utils.run_backend.state import MorphGlobalContext
-from morph.task.utils.sqlite import SqliteDBManager
 
 
 class NewTask(BaseTask):
@@ -56,10 +54,6 @@ class NewTask(BaseTask):
         if not os.path.exists(db_path):
             with open(db_path, "w") as f:
                 f.write("")
-
-        # Initialize the project database
-        db_manager = SqliteDBManager(self.project_root)
-        db_manager.initialize_database()
 
         # Execute the post-setup tasks
         original_working_dir = os.getcwd()

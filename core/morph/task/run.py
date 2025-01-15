@@ -26,11 +26,7 @@ from morph.task.utils.run_backend.errors import (
     MorphFunctionLoadError,
     logging_file_error_exception,
 )
-from morph.task.utils.run_backend.execution import (
-    RunDagArgs,
-    generate_variables_hash,
-    run_cell,
-)
+from morph.task.utils.run_backend.execution import RunDagArgs, run_cell
 from morph.task.utils.run_backend.output import (
     finalize_run,
     is_async_generator,
@@ -45,7 +41,7 @@ from morph.task.utils.run_backend.state import (
     MorphGlobalContext,
     load_cache,
 )
-from morph.task.utils.sqlite import CliError, RunStatus, SqliteDBManager
+from morph.task.utils.run_backend.types import CliError, RunStatus
 from morph.task.utils.timezone import TimezoneManager
 
 
@@ -98,10 +94,6 @@ class RunTask(BaseTask):
         save_project(self.project_root, self.project)
         if self.project.project_id is not None:
             os.environ["MORPH_PROJECT_ID"] = self.project.project_id
-
-        # Initialize database
-        self.db_manager = SqliteDBManager(self.project_root)
-        self.db_manager.initialize_database()
 
         context = MorphGlobalContext.get_instance()
         try:
@@ -213,28 +205,11 @@ class RunTask(BaseTask):
                 tz_manager.set_timezone(desired_tz)
 
     def run(self) -> Any:
-        cached_cell = (
-            self.meta_obj_cache.find_by_name(self.cell_alias)
-            if self.meta_obj_cache
-            else None
-        )
-
-        self.db_manager.insert_run_record(
-            self.run_id,
-            self.cell_alias,
-            self.is_dag,
-            self.log_path,
-            cached_cell.checksum if cached_cell else None,
-            generate_variables_hash(self.vars),
-            self.vars,
-        )
-
         if self.ext != ".sql" and self.ext != ".py":
             text = "Invalid file type. Please specify a .sql or .py file."
             self.logger.error(text)
             finalize_run(
                 self.project,
-                self.db_manager,
                 self.resource,
                 self.cell_alias,
                 RunStatus.FAILED.value,
@@ -267,7 +242,6 @@ class RunTask(BaseTask):
                 output = run_cell(
                     self.project,
                     self.resource,
-                    self.db_manager,
                     self.vars,
                     self.logger,
                     dag,
@@ -287,7 +261,6 @@ class RunTask(BaseTask):
                 click.echo(click.style(text, fg="red"))
                 finalize_run(
                     self.project,
-                    self.db_manager,
                     self.resource,
                     cell,
                     RunStatus.FAILED.value,
@@ -311,7 +284,6 @@ class RunTask(BaseTask):
                 if self.mode == "api":
                     return stream_and_write_and_response(
                         self.project,
-                        self.db_manager,
                         self.resource,
                         cell,
                         RunStatus.DONE.value,
@@ -323,7 +295,6 @@ class RunTask(BaseTask):
                 else:
                     stream_and_write(
                         self.project,
-                        self.db_manager,
                         self.resource,
                         cell,
                         RunStatus.DONE.value,
@@ -335,7 +306,6 @@ class RunTask(BaseTask):
             else:
                 finalize_run(
                     self.project,
-                    self.db_manager,
                     self.resource,
                     cell,
                     RunStatus.DONE.value,

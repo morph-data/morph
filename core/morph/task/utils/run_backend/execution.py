@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import asyncio
 import base64
 import hashlib
@@ -8,9 +7,7 @@ import io
 import json
 import logging
 import os
-import time
-from datetime import datetime
-from typing import Any, Callable, List, Optional, Union, cast
+from typing import Any, Callable, List, Optional, Union
 
 import pandas as pd
 from jinja2 import BaseLoader, Environment
@@ -18,7 +15,7 @@ from morph_lib.error import RequestError
 from morph_lib.types import HtmlImageResponse, MarkdownResponse, MorphChatStreamChunk
 from pydantic import BaseModel
 
-from morph.config.project import MorphProject
+from morph.config.project import MorphProject, default_output_paths
 from morph.task.utils.connection import Connection, ConnectionYaml, DatabaseConnection
 from morph.task.utils.connections.connector import Connector
 from morph.task.utils.logging import (
@@ -36,7 +33,7 @@ from morph.task.utils.run_backend.output import (
     stream_and_write,
     transform_output,
 )
-from morph.task.utils.sqlite import CliError, RunStatus, SqliteDBManager
+from morph.task.utils.run_backend.types import CliError, RunStatus
 
 from .state import (
     MorphFunctionMetaObject,
@@ -58,7 +55,6 @@ class RunCellResult(BaseModel):
 def run_cell(
     project: Optional[MorphProject],
     cell: str | MorphFunctionMetaObject,
-    db_manager: SqliteDBManager,
     vars: dict[str, Any] = {},
     logger: logging.Logger | None = None,
     dag: Optional[RunDagArgs] = None,
@@ -102,7 +98,6 @@ def run_cell(
             required_data_result = _run_cell_with_dag(
                 project,
                 required_meta_obj,
-                db_manager,
                 vars,
                 dag,
                 meta_obj_cache,
@@ -111,7 +106,6 @@ def run_cell(
             required_data_result = run_cell(
                 project,
                 required_meta_obj,
-                db_manager,
                 vars,
                 logger,
                 None,
@@ -193,95 +187,62 @@ def run_cell(
         or 0
     )
     if project and cache_ttl > 0 and cached_cell and is_cache_valid:
-        if len(vars.items()) == 0:
-            cache, _ = db_manager.get_run_records(
-                None,
-                meta_obj.name,
-                RunStatus.DONE.value,
-                "started_at",
-                "DESC",
-                1,
-                None,
-                cached_cell.checksum,
-                None,
-                datetime.fromtimestamp(int(time.time()) - cache_ttl),
+        cache_outputs = default_output_paths()
+        if len(cache_outputs) > 1:
+            html_path = next(
+                (x for x in cache_outputs if x.split(".")[-1] == "html"), None
             )
-        else:
-            cache, _ = db_manager.get_run_records(
-                None,
-                meta_obj.name,
-                RunStatus.DONE.value,
-                "started_at",
-                "DESC",
-                1,
-                None,
-                cached_cell.checksum,
-                generate_variables_hash(vars),
-                datetime.fromtimestamp(int(time.time()) - cache_ttl),
+            image_path = next(
+                (x for x in cache_outputs if x.split(".")[-1] == "png"), None
             )
-        if len(cache) > 0:
-            cache_outputs = ast.literal_eval(cache[0]["outputs"])
-            if len(cache_outputs) > 1:
-                html_path = next(
-                    (x for x in cache_outputs if x.split(".")[-1] == "html"), None
+            if html_path and image_path:
+                if logger:
+                    logger.info(f"{meta_obj.name} using cached result.")
+                return RunCellResult(
+                    result=HtmlImageResponse(
+                        html=open(html_path, "r").read(),
+                        image=convert_image_base64(image_path),
+                    )
                 )
-                image_path = next(
-                    (x for x in cache_outputs if x.split(".")[-1] == "png"), None
-                )
-                if html_path and image_path:
+        if len(cache_outputs) > 0:
+            cache_path = cache_outputs[0]
+            cache_path_ext = cache_path.split(".")[-1]
+            if cache_path_ext in {
+                "parquet",
+                "csv",
+                "json",
+                "md",
+                "txt",
+                "html",
+                "png",
+            } and os.path.exists(cache_path):
+                cached_result = None
+                if cache_path_ext == "parquet":
+                    cached_result = RunCellResult(result=pd.read_parquet(cache_path))
+                elif cache_path_ext == "csv":
+                    cached_result = RunCellResult(result=pd.read_csv(cache_path))
+                elif cache_path_ext == "json":
+                    json_dict = json.loads(open(cache_path, "r").read())
+                    if not MorphChatStreamChunk.is_chat_stream_chunk_json(json_dict):
+                        cached_result = RunCellResult(
+                            result=pd.read_json(cache_path, orient="records")
+                        )
+                elif cache_path_ext == "md" or cache_path_ext == "txt":
+                    cached_result = RunCellResult(
+                        result=MarkdownResponse(open(cache_path, "r").read())
+                    )
+                elif cache_path_ext == "html":
+                    cached_result = RunCellResult(
+                        result=HtmlImageResponse(html=open(cache_path, "r").read())
+                    )
+                elif cache_path_ext == "png":
+                    cached_result = RunCellResult(
+                        result=HtmlImageResponse(image=convert_image_base64(cache_path))
+                    )
+                if cached_result:
                     if logger:
                         logger.info(f"{meta_obj.name} using cached result.")
-                    return RunCellResult(
-                        result=HtmlImageResponse(
-                            html=open(html_path, "r").read(),
-                            image=convert_image_base64(image_path),
-                        )
-                    )
-            if len(cache_outputs) > 0:
-                cache_path = cast(str, cache_outputs[0])
-                cache_path_ext = cache_path.split(".")[-1]
-                if cache_path_ext in {
-                    "parquet",
-                    "csv",
-                    "json",
-                    "md",
-                    "txt",
-                    "html",
-                    "png",
-                } and os.path.exists(cache_path):
-                    cached_result = None
-                    if cache_path_ext == "parquet":
-                        cached_result = RunCellResult(
-                            result=pd.read_parquet(cache_path)
-                        )
-                    elif cache_path_ext == "csv":
-                        cached_result = RunCellResult(result=pd.read_csv(cache_path))
-                    elif cache_path_ext == "json":
-                        json_dict = json.loads(open(cache_path, "r").read())
-                        if not MorphChatStreamChunk.is_chat_stream_chunk_json(
-                            json_dict
-                        ):
-                            cached_result = RunCellResult(
-                                result=pd.read_json(cache_path, orient="records")
-                            )
-                    elif cache_path_ext == "md" or cache_path_ext == "txt":
-                        cached_result = RunCellResult(
-                            result=MarkdownResponse(open(cache_path, "r").read())
-                        )
-                    elif cache_path_ext == "html":
-                        cached_result = RunCellResult(
-                            result=HtmlImageResponse(html=open(cache_path, "r").read())
-                        )
-                    elif cache_path_ext == "png":
-                        cached_result = RunCellResult(
-                            result=HtmlImageResponse(
-                                image=convert_image_base64(cache_path)
-                            )
-                        )
-                    if cached_result:
-                        if logger:
-                            logger.info(f"{meta_obj.name} using cached result.")
-                        return cached_result
+                    return cached_result
 
     # execute the cell
     if ext == "sql":
@@ -470,7 +431,6 @@ def _run_sql(
 def _run_cell_with_dag(
     project: Optional[MorphProject],
     cell: MorphFunctionMetaObject,
-    db_manager: SqliteDBManager,
     vars: dict[str, Any] = {},
     dag: Optional[RunDagArgs] = None,
     meta_obj_cache: Optional[MorphFunctionMetaObjectCache] = None,
@@ -481,18 +441,6 @@ def _run_cell_with_dag(
     log_path = os.path.join(dag.runs_dir, f"{cell.name}.log")
     logger = get_morph_logger(log_path)
 
-    cached_cell = meta_obj_cache.find_by_name(cell.name) if meta_obj_cache else None
-
-    db_manager.insert_run_record(
-        dag.run_id,
-        cell.name,
-        True,
-        log_path,
-        cached_cell.checksum if cached_cell else None,
-        generate_variables_hash(vars),
-        vars,
-    )
-
     filepath = cell.id.split(":")[0]
     ext = os.path.splitext(os.path.basename(filepath))[1]
     try:
@@ -500,7 +448,6 @@ def _run_cell_with_dag(
         output = run_cell(
             project,
             cell,
-            db_manager,
             vars,
             logger,
             dag,
@@ -514,7 +461,6 @@ def _run_cell_with_dag(
         logger.error(text)
         finalize_run(
             project,
-            db_manager,
             cell,
             cell.name,
             RunStatus.FAILED.value,
@@ -535,7 +481,6 @@ def _run_cell_with_dag(
     ):
         stream_and_write(
             project,
-            db_manager,
             cell,
             cell.name,
             RunStatus.DONE.value,
@@ -547,7 +492,6 @@ def _run_cell_with_dag(
     else:
         finalize_run(
             project,
-            db_manager,
             cell,
             cell.name,
             RunStatus.DONE.value,

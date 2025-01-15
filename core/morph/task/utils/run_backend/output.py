@@ -6,7 +6,6 @@ import logging
 import os
 import threading
 import traceback
-from pathlib import Path
 from typing import Any, Dict, Generator, List, Literal, Optional, Union, cast
 
 import click
@@ -30,7 +29,7 @@ from morph.task.utils.logging import (
 )
 from morph.task.utils.morph import Resource
 from morph.task.utils.run_backend.state import MorphFunctionMetaObject
-from morph.task.utils.sqlite import CliError, RunStatus, SqliteDBManager
+from morph.task.utils.run_backend.types import CliError, RunStatus
 
 
 class StreamChatResponse(BaseModel):
@@ -51,7 +50,6 @@ class StreamChatResponse(BaseModel):
 
 def finalize_run(
     project: Optional[MorphProject],
-    db_manager: SqliteDBManager,
     resource: MorphFunctionMetaObject,
     cell_alias: str,
     final_state: str,
@@ -60,28 +58,12 @@ def finalize_run(
     run_id: str,
     error: Optional[CliError],
 ) -> None:
-    output_paths: Optional[List[str]] = (
-        _save_output_to_file(
-            project,
-            resource,
-            output,
-            logger,
-            run_id,
-        )
-        if final_state != RunStatus.FAILED.value
-        else None
-    )
-    abs_output_paths: List[str] = []
-    for output_path in output_paths if output_paths is not None else []:
-        abs_path = Path(output_path).resolve()
-        abs_output_paths.append(str(abs_path))
-
-    db_manager.update_run_record(
+    _save_output_to_file(
+        project,
+        resource,
+        output,
+        logger,
         run_id,
-        cell_alias,
-        final_state,
-        error,
-        None if len(abs_output_paths) < 1 else abs_output_paths,
     )
 
 
@@ -166,7 +148,6 @@ def is_generator(output: Any) -> bool:
 
 def stream_and_write_and_response(
     project: Optional[MorphProject],
-    db_manager: SqliteDBManager,
     resource: MorphFunctionMetaObject,
     cell_alias: str,
     final_state: str,
@@ -204,7 +185,6 @@ def stream_and_write_and_response(
             finally:
                 finalize_run(
                     project,
-                    db_manager,
                     resource,
                     cell_alias,
                     final_state_,
@@ -246,7 +226,6 @@ def stream_and_write_and_response(
         finally:
             finalize_run(
                 project,
-                db_manager,
                 resource,
                 cell_alias,
                 final_state,
@@ -264,7 +243,6 @@ def stream_and_write_and_response(
 
 def stream_and_write(
     project: Optional[MorphProject],
-    db_manager: SqliteDBManager,
     resource: MorphFunctionMetaObject,
     cell_alias: str,
     final_state: str,
@@ -300,7 +278,6 @@ def stream_and_write(
             finally:
                 finalize_run(
                     project,
-                    db_manager,
                     resource,
                     cell_alias,
                     final_state_,
@@ -334,7 +311,6 @@ def stream_and_write(
         finally:
             finalize_run(
                 project,
-                db_manager,
                 resource,
                 cell_alias,
                 final_state,

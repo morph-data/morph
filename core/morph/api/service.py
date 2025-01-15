@@ -29,7 +29,7 @@ from morph.api.utils import (
     convert_vg_json_to_html,
 )
 from morph.cli.flags import Flags
-from morph.config.project import load_project
+from morph.config.project import default_output_paths, load_project
 from morph.task.resource import PrintResourceTask
 from morph.task.run import RunTask
 from morph.task.utils.morph import find_project_root_dir
@@ -369,17 +369,7 @@ async def file_upload_service(input: UploadFileService) -> Any:
         )
 
         # Retrieve the result of the file_upload function
-        project_root = find_project_root_dir()
-        db_manager = SqliteDBManager(project_root)
-
-        run_results = db_manager.get_run_records_by_run_id(run_id)
-        run_result = next(
-            (result for result in run_results if result["run_id"] == run_id), None
-        )
-
-        # Retrieve the saved file path from the output
-        output_file = ast.literal_eval(run_result["outputs"])[0] if run_result else None
-        print(output_file)
+        output_file = default_output_paths()[0]
         with open(output_file, "r") as f:
             saved_filepath = f.read()
 
