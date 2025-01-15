@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import click
@@ -22,17 +23,24 @@ class CleanTask(BaseTask):
             raise e
 
         clean_dir = Path(project_root).joinpath(".morph")
-        clean_files = ["meta.json", "knowledge.json", "template.json"]
 
-        for _f in clean_files:
-            clean_file = clean_dir.joinpath(_f)
-            if clean_file.exists():
-                if verbose:
-                    click.echo(click.style(f"Removing {clean_file}", fg="yellow"))
-                clean_file.unlink()
-            else:
-                if verbose:
-                    click.echo(click.style(f"File {clean_file} not found", fg="yellow"))
+        if clean_dir.exists():
+            # Delete the entire .morph directory
+            if verbose:
+                click.echo(
+                    click.style(f"Removing directory {clean_dir}...", fg="yellow")
+                )
+            shutil.rmtree(clean_dir)
+
+            # Recreate the empty .morph directory
+            clean_dir.mkdir(parents=True, exist_ok=True)
+            if verbose:
+                click.echo(
+                    click.style(f"Recreated empty directory {clean_dir}", fg="yellow")
+                )
+        else:
+            if verbose:
+                click.echo(click.style(f"Directory {clean_dir} not found", fg="yellow"))
 
         click.echo(
             click.style(
