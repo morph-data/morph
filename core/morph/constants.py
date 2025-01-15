@@ -10,7 +10,6 @@ class MorphConstant:
     TMP_MORPH_DIR = "/tmp/morph"
     # Files
     MORPH_CRED_PATH = os.path.expanduser("~/.morph/credentials")
-    MORPH_PROJECT_DB = "morph_project.sqlite3"
     MORPH_CONNECTION_PATH = os.path.expanduser("~/.morph/connections.yml")
     MORPH_DEPLOYMENT_PATH = os.path.expanduser("~/.morph/.deployed")
     MORPH_CLOUD_CONFIG_PATH = "/tmp/vm.json"

@@ -50,11 +50,6 @@ class NewTask(BaseTask):
                 dest_file = os.path.join(target_path, template_file)
                 shutil.copy2(src_file, dest_file)
 
-        db_path = f"{self.project_root}/morph_project.sqlite3"
-        if not os.path.exists(db_path):
-            with open(db_path, "w") as f:
-                f.write("")
-
         # Execute the post-setup tasks
         original_working_dir = os.getcwd()
         os.chdir(self.project_root)
