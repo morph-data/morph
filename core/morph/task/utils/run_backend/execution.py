@@ -44,7 +44,6 @@ from .state import (
 
 class RunDagArgs(BaseModel):
     run_id: str
-    runs_dir: str
 
 
 class RunCellResult(BaseModel):
@@ -438,8 +437,7 @@ def _run_cell_with_dag(
     if dag is None:
         raise ValueError("dag is not set.")
 
-    log_path = os.path.join(dag.runs_dir, f"{cell.name}.log")
-    logger = get_morph_logger(log_path)
+    logger = get_morph_logger()
 
     filepath = cell.id.split(":")[0]
     ext = os.path.splitext(os.path.basename(filepath))[1]

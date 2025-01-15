@@ -170,22 +170,7 @@ class RunTask(BaseTask):
         self.resource = resource
         self.ext = os.path.splitext(os.path.basename(self.filename))[1]
         self.cell_alias = str(self.resource.name)
-
-        # Set up run directory
-        self.runs_dir = os.path.normpath(
-            os.path.join(
-                self.project_root,
-                ".morph/runs",
-                self.run_id,
-            )
-        )
-        if not os.path.exists(self.runs_dir):
-            os.makedirs(self.runs_dir)
-
-        # Set up logger
-        log_filename = f"{os.path.splitext(os.path.basename(self.cell_alias))[0]}.log"
-        self.log_path = os.path.join(self.runs_dir, log_filename)
-        self.logger = get_morph_logger(self.log_path)
+        self.logger = get_morph_logger()
 
         # load .env in project root and set timezone
         dotenv_path = os.path.join(self.project_root, ".env")
@@ -234,11 +219,7 @@ class RunTask(BaseTask):
             )
 
             try:
-                dag = (
-                    RunDagArgs(run_id=self.run_id, runs_dir=self.runs_dir)
-                    if self.is_dag
-                    else None
-                )
+                dag = RunDagArgs(run_id=self.run_id) if self.is_dag else None
                 output = run_cell(
                     self.project,
                     self.resource,
