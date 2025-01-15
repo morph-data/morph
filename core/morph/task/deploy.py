@@ -1,4 +1,3 @@
-import hashlib
 import os
 import shutil
 import subprocess
@@ -124,8 +123,8 @@ class DeployTask(BaseTask):
         self._save_docker_image()
 
         # 4. Compute the checksum of the .tar file
-        image_checksum = self._compute_file_sha256(self.output_tar)
-        click.echo(click.style(f"Computed checksum: {image_checksum}", fg="blue"))
+        image_checksum = self._get_image_digest(self.image_name)
+        click.echo(click.style(f"Docker image checksum: {image_checksum}", fg="blue"))
 
         # 5. Call the Morph API to initialize a deployment and get the pre-signed URL
         try:
@@ -367,15 +366,39 @@ class DeployTask(BaseTask):
             sys.exit(1)
 
     @staticmethod
-    def _compute_file_sha256(file_path: str) -> str:
+    def _get_image_digest(image_name: str) -> str:
         """
-        Computes and returns the SHA256 checksum of the specified file.
+        Retrieves the sha256 digest of the specified Docker image.
+        @param image_name:
+        @return:
         """
-        sha256_hash = hashlib.sha256()
-        with open(file_path, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest()
+        try:
+            # Use `docker inspect` to get the image digest
+            result = subprocess.run(
+                ["docker", "inspect", "--format='{{index .Id}}'", image_name],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                text=True,
+            )
+            digest = result.stdout.strip().strip("'")
+            if digest.startswith("sha256:"):
+                return digest
+            else:
+                raise ValueError(f"Unexpected digest format: {digest}")
+        except subprocess.CalledProcessError as e:
+            click.echo(
+                click.style(f"Error retrieving Docker image digest: {str(e)}", fg="red")
+            )
+            sys.exit(1)
+        except Exception as e:
+            click.echo(
+                click.style(
+                    f"Unexpected error retrieving Docker image digest: {str(e)}",
+                    fg="red",
+                )
+            )
+            sys.exit(1)
 
     @staticmethod
     def _upload_image_to_presigned_url(presigned_url: str, file_path: str) -> None:
