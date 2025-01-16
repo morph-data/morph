@@ -67,11 +67,18 @@ class DeployTask(BaseTask):
             )
             sys.exit(1)
 
-        # Frontend settings
+        # Frontend and backend settings
+        self.frontend_template_dir = os.path.join(
+            Path(__file__).resolve().parents[1], "frontend", "template"
+        )
         self.frontend_dir = os.path.join(self.project_root, ".morph/frontend")
         self.dist_dir = os.path.join(self.frontend_dir, "dist")
+        self.backend_template_dir = os.path.join(
+            Path(__file__).resolve().parents[1], "api"
+        )
+        self.backend_dir = os.path.join(self.project_root, ".morph/core/morph/api")
 
-        # Docker image settings: use .tar instead
+        # Docker settings
         self.image_name = f"{os.path.basename(self.project_root)}:latest"
         self.output_tar = os.path.join(
             self.project_root, f".morph/{os.path.basename(self.project_root)}.tar"
@@ -108,8 +115,8 @@ class DeployTask(BaseTask):
             sys.exit(1)
         shutil.copy2(entrypoint_file, os.path.join(self.project_root, ".morph/app.py"))
 
-        # 1. Build the frontend
-        self._build_frontend()
+        # 1. Build the source code
+        self._copy_and_build_source()
 
         # 2. Build the Docker image
         click.echo(click.style("Building Docker image...", fg="blue"))
@@ -201,6 +208,7 @@ class DeployTask(BaseTask):
         """
         Checks if the required dependency files exist based on the package manager.
         """
+        # TODO: automatically dump and create requirements.txt or pyproject.toml if missing
         if self.package_manager == "pip":
             requirements_file = os.path.join(self.project_root, "requirements.txt")
             if not os.path.exists(requirements_file):
@@ -276,30 +284,29 @@ class DeployTask(BaseTask):
             click.echo(click.style("Aborted!"))
             sys.exit(1)
 
-    def _build_frontend(self):
-        """
-        Builds the frontend using npm and moves the build output into .morph/frontend.
-        """
+    def _copy_and_build_source(self):
         try:
             click.echo(click.style("Building frontend...", fg="blue"))
+
+            # Copy the frontend template
+            if os.path.exists(self.frontend_dir):
+                shutil.rmtree(self.frontend_dir)  # Remove existing frontend directory
+            os.makedirs(self.frontend_dir, exist_ok=True)
+            shutil.copytree(
+                self.frontend_template_dir, self.frontend_dir, dirs_exist_ok=True
+            )
+
+            # Copy the backend template
+            if os.path.exists(self.backend_dir):
+                shutil.rmtree(self.backend_dir)  # Remove existing backend directory
+            os.makedirs(self.backend_dir, exist_ok=True)
+            shutil.copytree(
+                self.backend_template_dir, self.backend_dir, dirs_exist_ok=True
+            )
 
             # Run npm install and build
             subprocess.run(["npm", "install"], cwd=self.project_root, check=True)
             subprocess.run(["npm", "run", "build"], cwd=self.project_root, check=True)
-
-            dist_dir = os.path.join(self.project_root, "dist")
-            if not os.path.exists(dist_dir):
-                raise FileNotFoundError(
-                    "Frontend build failed: 'dist/' directory not found."
-                )
-
-            # Remove existing .morph/frontend if it exists
-            if os.path.exists(self.frontend_dir):
-                shutil.rmtree(self.frontend_dir)  # Remove existing frontend directory
-            os.makedirs(self.frontend_dir, exist_ok=True)
-
-            # Move dist/ to .morph/frontend
-            shutil.move(dist_dir, self.dist_dir)
 
         except subprocess.CalledProcessError as e:
             click.echo(click.style(f"Error building frontend: {str(e)}", fg="red"))

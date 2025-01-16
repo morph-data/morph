@@ -1,16 +1,23 @@
 # Base image for AWS Lambda
 FROM public.ecr.aws/lambda/python:3.9
 
+RUN yum install -y \
+    postgresql-devel \
+    gcc \
+    gcc-c++ && \
+    yum clean all
+
 # Set working directory
 WORKDIR /var/task
 
 # Copy source code and dependencies
 COPY .morph/main.py /var/task/main.py
 COPY .morph/frontend/dist /var/task/.morph/frontend/dist
+COPY .morph/core/morph/api /var/task/core/morph/api
 
 # Install Python dependencies with pip
 COPY requirements.txt /var/task/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Command to run the Lambda function
-CMD ["main.handler"]
+CMD ["core.morph.api.app.handler"]
