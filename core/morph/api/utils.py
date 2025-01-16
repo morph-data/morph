@@ -45,27 +45,6 @@ def convert_file_output(
         return img_base64
 
 
-def convert_vg_json_to_html(vg_json: str) -> str:
-    html_template = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
-    </head>
-    <body>
-    <div id="vis"></div>
-    <script type="text/javascript">
-        var spec = {vg_json};
-        vegaEmbed('#vis', spec);
-    </script>
-    </body>
-    </html>
-    """
-    return html_template.replace("\n", "")
-
-
 def convert_variables_values(variables: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if variables is None:
         return {}

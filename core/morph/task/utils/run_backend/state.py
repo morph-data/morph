@@ -23,7 +23,6 @@ from .inspection import (
     DirectoryScanResult,
     _import_python_file,
     _import_sql_file,
-    _import_vg_json_file,
     get_checksum,
     import_files,
 )
@@ -158,27 +157,6 @@ class MorphGlobalContext:
                 ),
             )
             self.update_meta_object(key, meta_obj)
-        for key, value in result.vg_json_contexts.items():
-            meta_obj = MorphFunctionMetaObject(
-                id=value["id"] if "id" in value else None,
-                name=value["name"] if "name" in value else None,
-                function=value["function"] if "function" in value else None,
-                description=value["description"] if "description" in value else None,
-                title=value["title"] if "title" in value else None,
-                schemas=value["schemas"] if "schemas" in value else [],
-                terms=value["terms"] if "terms" in value else [],
-                variables=value["variables"] if "variables" in value else {},
-                data_requirements=(
-                    value["data_requirements"] if "data_requirements" in value else []
-                ),
-                output_paths=value["output_paths"] if "output_paths" in value else [],
-                output_type=value["output_type"] if "output_type" in value else None,
-                connection=value["connection"] if "connection" in value else None,
-                result_cache_ttl=(
-                    value["result_cache_ttl"] if "result_cache_ttl" in value else None
-                ),
-            )
-            self.update_meta_object(key, meta_obj)
 
         entirety_errors = self._check_entirety_errors()
         result.errors += entirety_errors
@@ -282,46 +260,6 @@ class MorphGlobalContext:
             _, error = _import_python_file(target_item.file_path)
         elif suffix == "sql":
             _, context, error = _import_sql_file(project, target_item.file_path)
-            for key, value in context.items():
-                meta = MorphFunctionMetaObject(
-                    id=value["id"] if "id" in value else None,
-                    name=value["name"] if "name" in value else None,
-                    function=value["function"] if "function" in value else None,
-                    description=(
-                        value["description"] if "description" in value else None
-                    ),
-                    title=value["title"] if "title" in value else None,
-                    schemas=value["schemas"] if "schemas" in value else [],
-                    terms=value["terms"] if "terms" in value else [],
-                    variables=value["variables"] if "variables" in value else {},
-                    data_requirements=(
-                        value["data_requirements"]
-                        if "data_requirements" in value
-                        else []
-                    ),
-                    output_paths=(
-                        value["output_paths"] if "output_paths" in value else []
-                    ),
-                    output_type=(
-                        value["output_type"] if "output_type" in value else None
-                    ),
-                    connection=value["connection"] if "connection" in value else None,
-                    result_cache_ttl=(
-                        value["result_cache_ttl"]
-                        if "result_cache_ttl" in value
-                        else None
-                    ),
-                )
-                self.update_meta_object(key, meta)
-                for data_requirement in target_item.spec.data_requirements or []:
-                    for cache_error in cache.errors:
-                        if cache_error.name == data_requirement:
-                            return [cache_error]
-                    errors = self._partial_load(project, data_requirement, cache)
-                    if len(errors) > 0:
-                        return errors
-        elif target_item.file_path.endswith(".vg.json"):
-            _, context, error = _import_vg_json_file(target_item.file_path)
             for key, value in context.items():
                 meta = MorphFunctionMetaObject(
                     id=value["id"] if "id" in value else None,
