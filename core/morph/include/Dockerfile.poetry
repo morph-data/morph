@@ -11,7 +11,6 @@ RUN yum install -y \
 WORKDIR /var/task
 
 # Copy source code and dependencies
-COPY .morph/app.py /var/task/app.py
 COPY .morph/frontend/dist /var/task/.morph/frontend/dist
 COPY .morph/core/morph/api /var/task/core/morph/api
 
