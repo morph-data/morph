@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 
@@ -10,7 +11,7 @@ from morph.task.utils.morph import find_project_root_dir
 
 
 async def auth(authorization: str = Header(default=None)) -> None:
-    if authorization == "Bearer dummy":
+    if authorization is None or authorization == "Bearer dummy":
         # "dummy" is set when running in local
         project_root = find_project_root_dir()
         mock_json_path = f"{project_root}/.mock_user_context.json"
@@ -37,11 +38,21 @@ async def auth(authorization: str = Header(default=None)) -> None:
                 ErrorCode.AuthError, ErrorMessage.AuthErrorMessage["mockJsonInvalid"]
             )
 
-    # TODO: deserialize token
-    # user = UserInfo(
-    #     username=response_json["user"]["username"],
-    #     email=response_json["user"]["email"],
-    #     first_name=response_json["user"]["firstName"],
-    #     last_name=response_json["user"]["lastName"],
-    # )
-    # request_context.set({"user": user.model_dump()})
+    try:
+        token = authorization.split(" ")[1]
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise AuthError(
+                ErrorCode.AuthError, ErrorMessage.AuthErrorMessage["tokenInvalid"]
+            )
+
+        payload_encoded = parts[1]
+        payload_json = base64.urlsafe_b64decode(
+            payload_encoded + "=" * (-len(payload_encoded) % 4)
+        )
+        user_context_json = json.loads(payload_json)
+        request_context.set({"user": user_context_json})
+    except Exception:
+        raise AuthError(
+            ErrorCode.AuthError, ErrorMessage.AuthErrorMessage["tokenInvalid"]
+        )

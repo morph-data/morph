@@ -44,6 +44,7 @@ class ErrorMessage:
     AuthErrorMessage = {
         "notAuthorized": "Not authorized.",
         "mockJsonInvalid": "Invalid mock json.",
+        "tokenInvalid": "Invalid token.",
     }
     FileErrorMessage = {
         "notFound": "File not found.",
