@@ -41,7 +41,7 @@ app.add_exception_handler(
 frontend_dir = os.path.join(os.getcwd(), ".morph", "frontend")
 
 
-def getInertiaConfig():
+def get_inertia_config():
     templates_dir = os.path.join(Path(__file__).resolve().parent, "templates")
 
     if is_local_dev_mode:
@@ -68,7 +68,7 @@ def getInertiaConfig():
     )
 
 
-inertia_config = getInertiaConfig()
+inertia_config = get_inertia_config()
 
 InertiaDep = Annotated[Inertia, Depends(inertia_dependency_factory(inertia_config))]
 
