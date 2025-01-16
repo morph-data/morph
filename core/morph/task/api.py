@@ -138,7 +138,7 @@ class ApiTask(BaseTask):
             running_url = f"http://localhost:{self.server_port}"
             click.echo(
                 click.style(
-                    f"\nMorph is ready in preview mode!🚀\n\n ->  Local: {running_url}\n",
+                    f"\nMorph is running!🚀\n\n ->  Local: {running_url}\n",
                     fg="yellow",
                 )
             )
