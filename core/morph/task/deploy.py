@@ -68,9 +68,6 @@ class DeployTask(BaseTask):
             sys.exit(1)
 
         # Frontend settings
-        self.frontend_src_dir = os.path.join(
-            Path(__file__).resolve().parents[1], "frontend"
-        )
         self.frontend_dir = os.path.join(self.project_root, ".morph/frontend")
         self.dist_dir = os.path.join(self.frontend_dir, "dist")
 
@@ -101,15 +98,15 @@ class DeployTask(BaseTask):
         """
         click.echo(click.style("Initiating deployment sequence...", fg="blue"))
 
-        # Copy main.py (entrypoint for lambda) to .morph directory
-        template_dir = Path(__file__).parents[1].joinpath("include")
-        entrypoint_file = template_dir.joinpath("main.py")
+        # Copy app.py (entrypoint for lambda) to .morph directory
+        api_dir = Path(__file__).parents[1].joinpath("api")
+        entrypoint_file = api_dir.joinpath("app.py")
         if not entrypoint_file.exists():
             click.echo(
                 click.style(f"Entrypoint file not found: {entrypoint_file}", fg="red")
             )
             sys.exit(1)
-        shutil.copy2(entrypoint_file, os.path.join(self.project_root, ".morph/main.py"))
+        shutil.copy2(entrypoint_file, os.path.join(self.project_root, ".morph/app.py"))
 
         # 1. Build the frontend
         self._build_frontend()
@@ -281,24 +278,29 @@ class DeployTask(BaseTask):
 
     def _build_frontend(self):
         """
-        Builds the frontend using npm.
+        Builds the frontend using npm and moves the build output into .morph/frontend.
         """
         try:
             click.echo(click.style("Building frontend...", fg="blue"))
-            subprocess.run(["npm", "install"], cwd=self.frontend_src_dir, check=True)
-            subprocess.run(
-                ["npm", "run", "build"], cwd=self.frontend_src_dir, check=True
-            )
 
-            if os.path.exists(self.frontend_dir):
-                shutil.rmtree(self.frontend_dir)
-            shutil.copytree(self.frontend_src_dir, self.frontend_dir)
+            # Run npm install and build
+            subprocess.run(["npm", "install"], cwd=self.project_root, check=True)
+            subprocess.run(["npm", "run", "build"], cwd=self.project_root, check=True)
 
-            if not os.path.exists(self.dist_dir):
+            dist_dir = os.path.join(self.project_root, "dist")
+            if not os.path.exists(dist_dir):
                 raise FileNotFoundError(
-                    "Frontend build failed: no 'dist' directory found."
+                    "Frontend build failed: 'dist/' directory not found."
                 )
-            click.echo(click.style("Frontend built successfully.", fg="green"))
+
+            # Remove existing .morph/frontend if it exists
+            if os.path.exists(self.frontend_dir):
+                shutil.rmtree(self.frontend_dir)  # Remove existing frontend directory
+            os.makedirs(self.frontend_dir, exist_ok=True)
+
+            # Move dist/ to .morph/frontend
+            shutil.move(dist_dir, self.dist_dir)
+
         except subprocess.CalledProcessError as e:
             click.echo(click.style(f"Error building frontend: {str(e)}", fg="red"))
             sys.exit(1)

@@ -6,8 +6,7 @@ WORKDIR /var/task
 
 # Copy source code and dependencies
 COPY .morph/main.py /var/task/main.py
-COPY .morph/frontend/dist /var/task/dist
-COPY .morph/frontend/src /var/task/src
+COPY .morph/frontend/dist /var/task/.morph/frontend/dist
 
 # Install Python dependencies with pip
 COPY requirements.txt /var/task/
