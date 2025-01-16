@@ -111,9 +111,8 @@ def run_file_with_type_service(
             ErrorCode.ExecutionError,
             ErrorMessage.ExecutionErrorMessage["executionFailed"],
         )
-    try:
-        output_paths = default_output_paths()
-    except Exception:  # noqa
+    output_paths = task.output_paths
+    if not output_paths or len(output_paths) == 0:
         raise WarningError(
             ErrorCode.ExecutionError,
             ErrorMessage.ExecutionErrorMessage["executionFailed"],

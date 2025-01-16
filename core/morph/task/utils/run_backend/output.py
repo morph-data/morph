@@ -57,8 +57,8 @@ def finalize_run(
     logger: logging.Logger,
     run_id: str,
     error: Optional[CliError],
-) -> None:
-    _save_output_to_file(
+) -> Optional[List[str]]:
+    return _save_output_to_file(
         project,
         resource,
         output,

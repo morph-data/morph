@@ -4,7 +4,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import click
 import pydantic
@@ -52,6 +52,7 @@ class RunTask(BaseTask):
         # class state
         self.final_state: Optional[str] = None
         self.error: Optional[str] = None
+        self.output_paths: Optional[List[str]] = None
 
         # parse arguments
         filename_or_alias: str = os.path.normpath(args.FILENAME)
@@ -198,7 +199,7 @@ class RunTask(BaseTask):
             self.error = "Invalid file type. Please specify a .sql or .py file."
             self.logger.error(self.error)
             self.final_state = RunStatus.FAILED.value
-            finalize_run(
+            self.output_paths = finalize_run(
                 self.project,
                 self.resource,
                 self.cell_alias,
@@ -247,7 +248,7 @@ class RunTask(BaseTask):
                 self.logger.error(self.error)
                 click.echo(click.style(self.error, fg="red"))
                 self.final_state = RunStatus.FAILED.value
-                finalize_run(
+                self.output_paths = finalize_run(
                     self.project,
                     self.resource,
                     cell,
@@ -293,7 +294,7 @@ class RunTask(BaseTask):
                     )
             else:
                 self.final_state = RunStatus.DONE.value
-                finalize_run(
+                self.output_paths = finalize_run(
                     self.project,
                     self.resource,
                     cell,
