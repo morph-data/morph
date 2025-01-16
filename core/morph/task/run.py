@@ -7,8 +7,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 import click
+import pandas as pd
 import pydantic
 from dotenv import dotenv_values, load_dotenv
+from tabulate import tabulate
 
 from morph.cli.flags import Flags
 from morph.config.project import (
@@ -264,6 +266,16 @@ class RunTask(BaseTask):
                 if self.mode == "api":
                     raise Exception(text)
                 return
+
+            # print preview of the DataFrame
+            if isinstance(output.result, pd.DataFrame):
+                preview = tabulate(
+                    output.result.head().values.tolist(),
+                    headers=output.result.columns.tolist(),
+                    tablefmt="grid",
+                    showindex=True,
+                )
+                self.logger.info("DataFrame preview:\n" + preview)
 
             if (
                 is_stream(output.result)

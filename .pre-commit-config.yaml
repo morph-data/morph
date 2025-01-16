@@ -54,4 +54,4 @@ repos:
       - id: mypy
         types: [ python ]
         exclude: ^.*example.*$
-        additional_dependencies: [ pandas-stubs, types-requests, types-PyYAML, pydantic ]
+        additional_dependencies: [ pandas-stubs, types-requests, types-PyYAML, pydantic, types-tabulate ]
