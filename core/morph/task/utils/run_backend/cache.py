@@ -27,6 +27,21 @@ class ExecutionCache:
             return  # Skip storing anything
 
         current_time = datetime.now().isoformat()
+        cache_entry = self.cache.get(function_name)
+
+        # Check if an existing cache entry is still valid
+        if cache_entry:
+            last_executed_at = cache_entry.get("last_executed_at")
+            if isinstance(last_executed_at, str):
+                last_executed_time = datetime.fromisoformat(last_executed_at)
+                if datetime.now() - last_executed_time <= timedelta(
+                    seconds=self.expiration_seconds
+                ):
+                    # Cache is still valid, only update the cache paths
+                    cache_entry["cache_paths"] = cache_paths
+                    return
+
+        # Either no cache entry exists, or the cache has expired
         self.cache[function_name] = {
             "last_executed_at": current_time,
             "cache_paths": cache_paths,
