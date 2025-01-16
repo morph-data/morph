@@ -46,7 +46,8 @@ def get_inertia_config():
     templates_dir = os.path.join(Path(__file__).resolve().parent, "templates")
 
     if is_local_dev_mode:
-        frontend_url = "http://localhost:3000"  # TODO: 被ったらずらす
+        front_port = os.getenv("MORPH_FRONT_PORT", "3000")
+        frontend_url = f"http://localhost:{front_port}"
         templates = Jinja2Templates(directory=templates_dir)
         templates.env.globals["local_dev_mode"] = True
         templates.env.globals["frontend_url"] = frontend_url

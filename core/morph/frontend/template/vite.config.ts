@@ -53,13 +53,11 @@ export default defineConfig((env) => ({
   base: env.mode === "development" ? "" : "/_vite-static",
   server: {
     host: "0.0.0.0",
-    // port: 3000,
     open: false,
     watch: {
       usePolling: true,
       disableGlobbing: false,
     },
-    // origin: env.mode === "development" ? "http://0.0.0.0:3000" : "",
   },
   resolve: {
     alias: {

@@ -179,7 +179,6 @@ class ApiTask(BaseTask):
                 start_new_session=True,
             )
         else:
-            print("port ", ["npm", "run", "dev", "--port", f"{self.front_port}"])
             self._run_process(
                 ["npm", "run", "dev", "--port", f"{self.front_port}"],
                 cwd=frontend_dir,
