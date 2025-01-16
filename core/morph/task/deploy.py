@@ -491,22 +491,29 @@ class DeployTask(BaseTask):
         else:
             click.echo(click.style(" done!", fg="green"))
 
-    def _execute_deployment(self, deployment_id: str, timeout: int = 900) -> None:
+    def _execute_deployment(
+        self, user_function_deployment_id: str, timeout: int = 900
+    ) -> None:
         """
         Executes the deployment and monitors its status until completion.
 
         Args:
-            deployment_id (str): The deployment ID to monitor.
+            user_function_deployment_id (str): The deployment ID to monitor.
             timeout (int): Maximum time to wait for status change (in seconds). Default is 15 minutes.
         """
         start_time = time.time()
         interval = 5  # Initial polling interval in seconds
 
-        click.echo(click.style("Starting deployment execution...", fg="blue"))
+        click.echo(
+            click.style(
+                f"Monitoring deployment status... (user_function_deployment_id: {user_function_deployment_id})",
+                fg="blue",
+            )
+        )
 
         # Initial API call to execute deployment
         try:
-            execute_resp = self.client.execute_deployment(deployment_id)
+            execute_resp = self.client.execute_deployment(user_function_deployment_id)
             if execute_resp.is_error():
                 click.echo(
                     click.style(
@@ -532,7 +539,9 @@ class DeployTask(BaseTask):
 
             try:
                 # Fetch deployment status
-                status_resp = self.client.execute_deployment(deployment_id)
+                status_resp = self.client.execute_deployment(
+                    user_function_deployment_id
+                )
                 if status_resp.is_error():
                     click.echo(
                         click.style(
