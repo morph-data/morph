@@ -16,6 +16,7 @@ from inertia import (
     inertia_request_validation_exception_handler,
     inertia_version_conflict_exception_handler,
 )
+from mangum import Mangum
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -153,3 +154,6 @@ async def subpages(full_path: str, inertia: InertiaDep) -> InertiaResponse:
             "token": "dummy",
         },
     )
+
+
+handler = Mangum(app)
