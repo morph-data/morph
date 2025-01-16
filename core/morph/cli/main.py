@@ -129,50 +129,6 @@ def run(
     return results, True
 
 
-@cli.command("print")
-@click.pass_context
-@global_flags
-@params.file
-@params.alias
-@params.all
-@params.verbose
-@requires.preflight
-@requires.postflight
-def print_resource(
-    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
-) -> Tuple[Union[Dict[str, Union[str, int, bool]], None], bool]:
-    """Print details for the specified resource by path or alias."""
-    from morph.task.resource import PrintResourceTask
-
-    task = PrintResourceTask(ctx.obj["flags"])
-    results = task.run()
-    return results, True
-
-
-@cli.command("create")
-@click.argument("filename", required=True)
-@click.option("--template", type=str, help="Specify the template name.")
-@click.option("--name", type=str, help="Specify the function name.")
-@click.option("--description", type=str, help="Specify the function description.")
-@click.option("--parent-name", type=str, help="Specify the parent function name.")
-@click.option("--connection", type=str, help="Specify the connection name.")
-@params.verbose
-@click.pass_context
-@global_flags
-@requires.preflight
-@requires.postflight
-def create(
-    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
-) -> Tuple[None, bool]:
-    """Create files, using global or user defined templates."""
-    from morph.task.create import CreateTask
-
-    task = CreateTask(ctx.obj["flags"])
-    task.run()
-
-    return None, True
-
-
 @cli.command("clean")
 @params.verbose
 @click.pass_context
@@ -227,13 +183,8 @@ def sync(
 
 
 @cli.command("serve")
-@params.port
-@params.host
-@params.restart
 @params.workdir
-@params.stop
-@params.build
-@params.no_log
+@params.preview
 @click.pass_context
 @global_flags
 @requires.preflight

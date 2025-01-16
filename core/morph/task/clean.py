@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import click
@@ -23,6 +24,7 @@ class CleanTask(BaseTask):
 
         clean_dir = Path(project_root).joinpath(".morph")
         clean_files = ["meta.json", "knowledge.json", "template.json"]
+        clean_directories = ["frontend"]
 
         for _f in clean_files:
             clean_file = clean_dir.joinpath(_f)
@@ -33,6 +35,20 @@ class CleanTask(BaseTask):
             else:
                 if verbose:
                     click.echo(click.style(f"File {clean_file} not found", fg="yellow"))
+
+        for _d in clean_directories:
+            clean_directory = clean_dir.joinpath(_d)
+            if clean_directory.exists():
+                if verbose:
+                    click.echo(click.style(f"Removing {clean_directory}", fg="yellow"))
+                shutil.rmtree(clean_directory)
+            else:
+                if verbose:
+                    click.echo(
+                        click.style(
+                            f"Directory {clean_directory} not found", fg="yellow"
+                        )
+                    )
 
         click.echo(
             click.style(

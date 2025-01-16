@@ -1,0 +1,14 @@
+{
+  "name": "morph-project",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "npm run build -w .morph/frontend"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "workspaces": [
+    ".morph/frontend"
+  ]
+}
