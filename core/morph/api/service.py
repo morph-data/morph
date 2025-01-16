@@ -33,6 +33,7 @@ from morph.task.resource import PrintResourceTask
 from morph.task.run import RunTask
 from morph.task.utils.morph import find_project_root_dir
 from morph.task.utils.run_backend.errors import MorphFunctionLoadError
+from morph.task.utils.run_backend.execution import execution_cache
 from morph.task.utils.run_backend.state import MorphGlobalContext
 from morph.task.utils.run_backend.types import RunStatus
 
@@ -118,6 +119,12 @@ def run_file_with_type_service(
             ErrorMessage.ExecutionErrorMessage["executionFailed"],
             "output not found",
         )
+
+    # ------------------------------------------------------------------
+    # After execution, update the global cache
+    # ------------------------------------------------------------------
+    execution_cache.update_cache(input.name, output_paths)
+
     output_path = output_paths[0]
     if input.type == "image" or input.type == "html":
         if len(output_paths) == 2:
