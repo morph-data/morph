@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import List
 
@@ -173,28 +174,8 @@ class DeployTask(BaseTask):
         # 6. Upload the tar to the pre-signed URL
         self._upload_image_to_presigned_url(presigned_url, self.output_tar)
 
-        # 7. Execute the deployment
-        try:
-            execute_resp = self.client.execute_deployment(user_function_deployment_id)
-        except Exception as e:
-            click.echo(click.style(f"Error executing deployment: {str(e)}", fg="red"))
-            sys.exit(1)
-
-        if execute_resp.is_error():
-            click.echo(
-                click.style(
-                    f"Error executing deployment: {execute_resp.text}",
-                    fg="red",
-                )
-            )
-            sys.exit(1)
-
-        status = execute_resp.json().get("status")
-        if not status:
-            click.echo(click.style("Error: No 'status' in the response.", fg="red"))
-            sys.exit(1)
-
-        click.echo(click.style(f"Deployment status: {status}", fg="blue"))
+        # 7. Execute deployment and monitor status
+        self._execute_deployment(user_function_deployment_id)
 
         # 8. Override environment variables
         self._override_env_variables()
@@ -483,3 +464,87 @@ class DeployTask(BaseTask):
             )
         else:
             click.echo(click.style(" done!", fg="green"))
+
+    def _execute_deployment(self, deployment_id: str, timeout: int = 900) -> None:
+        """
+        Executes the deployment and monitors its status until completion.
+
+        Args:
+            deployment_id (str): The deployment ID to monitor.
+            timeout (int): Maximum time to wait for status change (in seconds). Default is 15 minutes.
+        """
+        start_time = time.time()
+        interval = 5  # Initial polling interval in seconds
+
+        click.echo(click.style("Starting deployment execution...", fg="blue"))
+
+        # Initial API call to execute deployment
+        try:
+            execute_resp = self.client.execute_deployment(deployment_id)
+            if execute_resp.is_error():
+                click.echo(
+                    click.style(
+                        f"Error executing deployment: {execute_resp.text}", fg="red"
+                    )
+                )
+                sys.exit(1)
+        except Exception as e:
+            click.echo(click.style(f"Error executing deployment: {str(e)}", fg="red"))
+            sys.exit(1)
+
+        # Monitor the deployment status
+        while True:
+            elapsed_time = time.time() - start_time
+            if elapsed_time > timeout:
+                click.echo(
+                    click.style(
+                        "Timeout: Deployment did not finish within the allotted time.",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+
+            try:
+                # Fetch deployment status
+                status_resp = self.client.execute_deployment(deployment_id)
+                if status_resp.is_error():
+                    click.echo(
+                        click.style(
+                            f"Error fetching deployment status: {status_resp.text}",
+                            fg="red",
+                        )
+                    )
+                    sys.exit(1)
+
+                status = status_resp.json().get("status")
+                if not status:
+                    click.echo(
+                        click.style("Error: No 'status' in the response.", fg="red")
+                    )
+                    sys.exit(1)
+
+                click.echo(click.style(f"Current status: {status}", fg="yellow"))
+
+                # Check for final states
+                if status in ["succeeded", "failed"]:
+                    if status == "succeeded":
+                        click.echo(click.style("Deployment succeeded! 🎉", fg="green"))
+                    else:
+                        click.echo(click.style("Deployment failed. 💔", fg="red"))
+                    break
+
+            except Exception as e:
+                click.echo(
+                    click.style(f"Error fetching deployment status: {str(e)}", fg="red")
+                )
+                sys.exit(1)
+
+            # Adjust polling interval dynamically
+            if elapsed_time < 300:  # First 5 minutes
+                interval = 5
+            elif elapsed_time < 600:  # Next 5 minutes
+                interval = 15
+            else:  # Beyond 10 minutes
+                interval = 30
+
+            time.sleep(interval)
