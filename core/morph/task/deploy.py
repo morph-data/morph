@@ -187,9 +187,9 @@ class DeployTask(BaseTask):
     # --------------------------------------------------------
     def _verify_dependencies(self) -> None:
         """
-        Checks if the required dependency files exist based on the package manager.
+        Checks if the required dependency files exist based on the package manager
+        and ensures 'morph-data' is included in the dependencies.
         """
-        # TODO: automatically dump and create requirements.txt or pyproject.toml if missing
         if self.package_manager == "pip":
             requirements_file = os.path.join(self.project_root, "requirements.txt")
             if not os.path.exists(requirements_file):
@@ -200,12 +200,25 @@ class DeployTask(BaseTask):
                     )
                 )
                 sys.exit(1)
+
+            # Check if 'morph-data' is listed in requirements.txt
+            with open(requirements_file, "r") as f:
+                requirements = f.read()
+            if "morph-data" not in requirements:
+                click.echo(
+                    click.style(
+                        "Error: 'morph-data' is not listed in 'requirements.txt'. Please add it.",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+
         elif self.package_manager == "poetry":
-            poetry_files = [
-                os.path.join(self.project_root, "pyproject.toml"),
-                os.path.join(self.project_root, "poetry.lock"),
+            pyproject_file = os.path.join(self.project_root, "pyproject.toml")
+            poetry_lock_file = os.path.join(self.project_root, "poetry.lock")
+            missing_files = [
+                f for f in [pyproject_file, poetry_lock_file] if not os.path.exists(f)
             ]
-            missing_files = [f for f in poetry_files if not os.path.exists(f)]
             if missing_files:
                 click.echo(
                     click.style(
@@ -214,6 +227,19 @@ class DeployTask(BaseTask):
                     )
                 )
                 sys.exit(1)
+
+            # Check if 'morph-data' is listed in pyproject.toml
+            with open(pyproject_file, "r") as f:
+                pyproject_content = f.read()
+            if "morph-data" not in pyproject_content:
+                click.echo(
+                    click.style(
+                        "Error: 'morph-data' is not listed in 'pyproject.toml'. Please add it.",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+
         else:
             click.echo(
                 click.style(
