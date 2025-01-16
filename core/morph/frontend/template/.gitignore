@@ -29,5 +29,4 @@ local-test
 # project files
 src/pages/*
 !src/pages/.gitkeep
-src/main.tsx
 constants.js

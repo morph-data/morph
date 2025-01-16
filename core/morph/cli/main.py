@@ -172,6 +172,7 @@ def sync(
 @params.stop
 @params.build
 @params.no_log
+@params.preview
 @click.pass_context
 @global_flags
 @requires.preflight

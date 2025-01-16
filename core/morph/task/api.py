@@ -1,5 +1,6 @@
 import configparser
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -19,8 +20,6 @@ from morph.task.base import BaseTask
 from morph.task.utils.morph import find_project_root_dir
 from morph.task.utils.timezone import TimezoneManager
 
-# TODO: change architecture depending on frontend changes
-
 
 class ApiTask(BaseTask):
     def __init__(self, args: Flags):
@@ -32,7 +31,7 @@ class ApiTask(BaseTask):
             os.chdir(self.workdir)
         self.is_debug = self.args.NO_LOG is False
 
-        os.environ["MORPH_FRONT_BUILD"] = "true" if self.args.BUILD else "false"
+        os.environ["MORPH_LOCAL_DEV_MODE"] = "false" if self.args.PREVIEW else "true"
 
         config_path = MorphConstant.MORPH_CRED_PATH
         has_config = os.path.exists(config_path)
@@ -188,15 +187,11 @@ class ApiTask(BaseTask):
             self._serve()
 
     def _serve(self) -> None:
-        self._setup_frontend()
-
         current_dir = Path(__file__).resolve().parent
         server_script_path = os.path.join(current_dir, "server.py")
 
         signal.signal(signal.SIGINT, self._signal_handler)
         try:
-            frontend_dir = os.path.join(Path(__file__).resolve().parents[1], "frontend")
-
             self._run_process(
                 [sys.executable, server_script_path] + sys.argv[1:],
                 log=self.is_debug,
@@ -208,105 +203,65 @@ class ApiTask(BaseTask):
                     fg="green",
                 )
             )
-            self._run_process(
-                ["npm", "run", "dev"],
-                cwd=frontend_dir,
-                log=False,
-            )
-            running_url = f"http://localhost:{self.args.PORT}"
-            click.echo(
-                click.style(
-                    f"\nMorph is ready!🚀\n\n ->  Local: {running_url}\n",
-                    fg="yellow",
+
+            if self.args.PREVIEW:
+                running_url = f"http://localhost:{self.args.PORT}"
+                click.echo(
+                    click.style(
+                        f"\nMorph is ready in preview mode!🚀\n\n ->  Local: {running_url}\n",
+                        fg="yellow",
+                    )
                 )
-            )
+            else:
+                self._setup_frontend_for_dev()
+
+                frontend_dir = os.path.join(os.getcwd(), ".morph", "frontend")
+
+                subprocess.run(
+                    ["npm", "install"],
+                    cwd=frontend_dir,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    check=True,
+                )
+
+                self._run_process(
+                    ["npm", "run", "dev"],
+                    cwd=frontend_dir,
+                    log=False,
+                )
+                running_url = f"http://localhost:{self.args.PORT}"
+                click.echo(
+                    click.style(
+                        f"\nMorph is ready in development mode!🚀\n\n ->  Local: {running_url}\n",
+                        fg="yellow",
+                    )
+                )
             signal.pause()
         except KeyboardInterrupt:
             self._signal_handler(None, None)
 
-    def _setup_frontend(self) -> None:
-        # TODO: remove these codes
-        click.echo(
-            click.style(
-                "Starting server ...",
-                fg="green",
-            )
-        )
-        current_dir = Path(__file__).resolve()
-        frontend_dir = os.path.join(current_dir.parents[1], "frontend")
+    def _setup_frontend_for_dev(self) -> None:
+        project_root = find_project_root_dir()
 
-        main_tsx = os.path.join(frontend_dir, "src", "main.tsx")
-        main_base_tsx = os.path.join(frontend_dir, "src", "main-base.tsx")
-        constants_file = os.path.join(frontend_dir, "constants.js")
-        constants_base_file = os.path.join(frontend_dir, "constants-base.js")
-
-        if not self.args.BUILD:
-            rel_from_main_tsx_path = os.path.relpath(
-                os.getcwd(), start=os.path.dirname(main_tsx)
-            )
-            pages_dir_path = os.path.join(rel_from_main_tsx_path, "src", "pages")
-            pages_glob_pattern = os.path.join(pages_dir_path, "**", "*.mdx")
-            pages_path = os.path.join(
-                rel_from_main_tsx_path, "src", "pages", "${name}.mdx"
+        if not os.path.exists(f"{project_root}/.morph/frontend"):
+            frontend_template_path = (
+                Path(__file__).parents[1].joinpath("frontend", "template")
             )
 
-            with open(main_base_tsx, "r") as f:
-                m_content = f.read()
-                m_content = m_content.replace(
-                    "PAGES_GLOB_BASE_DIR_PATH", pages_dir_path
+            shutil.copytree(frontend_template_path, f"{project_root}/.morph/frontend")
+
+            try:
+                subprocess.run(
+                    f"cd {project_root}/.morph/frontend && npm install",
+                    shell=True,
+                    check=True,
                 )
-                m_content = m_content.replace(
-                    "PAGES_GLOB_BASE_PATH", pages_glob_pattern
+            except subprocess.CalledProcessError:
+                click.echo(
+                    click.style("Failed to install frontend dependencies.", fg="yellow")
                 )
-                m_content = m_content.replace("PAGES_PATH", pages_path)
-            with open(main_tsx, "w", encoding="utf-8") as f:
-                f.write(m_content)
-
-        rel_from_frontend_path = os.path.relpath(os.getcwd(), frontend_dir)
-        pages_dir_from_frontend_path = os.path.join(
-            rel_from_frontend_path, "src", "pages"
-        )
-        with open(constants_base_file, "r") as f:
-            c_content = f.read()
-            c_content = c_content.replace(
-                "%PAGES_GLOB_BASE_DIR_PATH_FROM_FRONTEND_ROOT%",
-                pages_dir_from_frontend_path,
-            )
-        with open(constants_file, "w", encoding="utf-8") as f:
-            f.write(c_content)
-
-        subprocess.run(
-            ["npm", "install"],
-            cwd=frontend_dir,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            check=True,
-        )
-
-    def _start_frontend(self) -> None:
-        current_dir = Path(__file__).resolve()
-        frontend_dir = os.path.join(current_dir.parents[1], "frontend")
-        if self.args.BUILD:
-            subprocess.run(
-                ["npm", "run", "build"],
-                cwd=frontend_dir,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                text=True,
-                start_new_session=True,
-            )
-        else:
-            subprocess.Popen(
-                ["npm", "run", "dev"],
-                cwd=frontend_dir,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                text=True,
-                start_new_session=True,
-            )
 
     def _run_process(
         self, command: List[str], cwd: Optional[str] = None, log: Optional[bool] = True

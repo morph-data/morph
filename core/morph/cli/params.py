@@ -251,3 +251,9 @@ project_id = click.option(
     type=str,
     help="Specify the project id.",
 )
+
+preview = click.option(
+    "--preview",
+    is_flag=True,
+    help="Serve application with pre-built frontend assets locally to simulate a production environment for testing.",
+)
