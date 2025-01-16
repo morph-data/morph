@@ -1,8 +1,7 @@
 import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
-import path, { resolve } from "path";
+import { resolve } from "path";
 import ViteRestart from "vite-plugin-restart";
-import { PAGES_GLOB_BASE_DIR_PATH_FROM_FRONTEND_ROOT } from "./constants";
 
 import mdx from "@mdx-js/rollup";
 import remarkGfm from "remark-gfm";
@@ -48,7 +47,7 @@ export default defineConfig((env) => ({
     },
     addImportToMDX(),
     ViteRestart({
-      restart: [PAGES_GLOB_BASE_DIR_PATH_FROM_FRONTEND_ROOT],
+      restart: ["../../src/pages/**/*"],
     }),
   ],
   base: env.mode === "development" ? "" : "/_vite-static",
@@ -65,7 +64,6 @@ export default defineConfig((env) => ({
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),
-      "/main.js": path.resolve(__dirname, "src/main.tsx"),
     },
   },
   build: {
@@ -75,7 +73,7 @@ export default defineConfig((env) => ({
     manifest: "manifest.json",
     rollupOptions: {
       input: {
-        main: resolve("./src/main-prod.tsx"),
+        main: resolve("./src/main.tsx"),
       },
       output: {
         entryFileNames: `assets/bundle.js`,
