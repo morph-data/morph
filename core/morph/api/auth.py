@@ -20,9 +20,9 @@ async def auth(authorization: str = Header(default=None)) -> None:
                 {
                     "user": UserInfo(
                         user_id="cea122ea-b240-49d7-ae7f-8b1e3d40dd8f",
-                        email="example@morph-data.io",
-                        username="sample",
-                        first_name="Sample",
+                        email="mock_user@morph-data.io",
+                        username="mock_user",
+                        first_name="Mock",
                         last_name="User",
                         roles=["Admin"],
                     ).model_dump()
