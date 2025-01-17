@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "morph-data"
-version = "0.0.3"
+version = "0.0.4"
 description = "Morph is a python-centric full-stack framework for building and deploying data apps."
 authors = ["Morph <contact@morphdb.io>"]
 packages = [
@@ -91,6 +91,7 @@ starlette = "^0.41.3"
 sqlalchemy-pytds = "^1.0.2"
 tabulate = "^0.9.0"
 responses = "^0.25.3"
+mangum = "^0.19.0"
 
 [tool.mypy]
 exclude = ["^.*\b(example)\b.*$"]

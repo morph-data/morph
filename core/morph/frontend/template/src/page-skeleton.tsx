@@ -1,6 +1,13 @@
 import React from "react";
-import { DropdownMenu, Button, MorphConfigEnsurer } from "@use-morph/page";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  Button,
+} from "@use-morph/components";
 import { ErrorBoundary, FallbackProps } from "react-error-boundary";
+import { Link } from "@inertiajs/react";
 
 function fallbackRender({ error }: FallbackProps) {
   // Call resetErrorBoundary() to reset the error boundary and retry the render.
@@ -22,9 +29,9 @@ export const PageSkeleton: React.FC<PageSkeletonProps> = (props) => {
     <ErrorBoundary fallbackRender={fallbackRender}>
       <div className="morph-page p-4">
         <div className="flex items-center gap-3">
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild>
-              <Button size="icon" variant={"ghost"}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="20"
@@ -42,20 +49,15 @@ export const PageSkeleton: React.FC<PageSkeletonProps> = (props) => {
                   <line x1="4" x2="20" y1="18" y2="18" />
                 </svg>
               </Button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="start">
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
               {props.routes.map((route) => (
-                <DropdownMenu.Item key={route.path} asChild>
-                  <a
-                    className="no-underline hover:underline !cursor-pointer"
-                    href={route.path}
-                  >
-                    {route.title}
-                  </a>
-                </DropdownMenu.Item>
+                <Link href={route.path} key={route.path}>
+                  <DropdownMenuItem>{route.title}</DropdownMenuItem>
+                </Link>
               ))}
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <div className="text-sm text-gray-500">{props.title}</div>
           <div className="flex-1"></div>
           <div className="text-gray-900 tracking-wide">
@@ -69,9 +71,7 @@ export const PageSkeleton: React.FC<PageSkeletonProps> = (props) => {
             </a>
           </div>
         </div>
-        <MorphConfigEnsurer>
-          {() => <div className="mt-4 p-2">{props.children}</div>}
-        </MorphConfigEnsurer>
+        <div className="mt-4 p-2">{props.children}</div>
       </div>
     </ErrorBoundary>
   );

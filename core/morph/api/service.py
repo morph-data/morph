@@ -22,11 +22,7 @@ from morph.api.types import (
     SuccessResponse,
     UploadFileService,
 )
-from morph.api.utils import (
-    convert_file_output,
-    convert_variables_values,
-    convert_vg_json_to_html,
-)
+from morph.api.utils import convert_file_output, convert_variables_values
 from morph.cli.flags import Flags
 from morph.config.project import default_output_paths, load_project
 from morph.task.resource import PrintResourceTask
@@ -55,26 +51,15 @@ def run_file_with_type_service(
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
     resource = context.search_meta_object_by_name(input.name)
     if resource is None:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
-    filepath = str(resource.id).split(":")[0]
-
-    if input.type == "html":
-        filename = str(os.path.basename(filepath))
-        if filename.endswith(".vg.json"):
-            with open(filepath, "r") as file:
-                content = file.read()
-            return RunFileWithTypeResponse(
-                type=input.type,
-                data=convert_vg_json_to_html(content),
-            )
 
     with click.Context(click.Command(name="")) as ctx:
         ctx.params["FILENAME"] = input.name
@@ -182,14 +167,14 @@ def run_file_service(input: RunFileService) -> SuccessResponse:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
     resource = context.search_meta_object_by_name(input.name)
     if resource is None:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
     with click.Context(click.Command(name="")) as ctx:
@@ -246,7 +231,7 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
     with click.Context(click.Command(name="")) as ctx:
@@ -351,13 +336,6 @@ async def file_upload_service(input: UploadFileService) -> Any:
         output_file = default_output_paths()[0]
         with open(output_file, "r") as f:
             saved_filepath = f.read()
-
-        if not os.path.isfile(saved_filepath):
-            raise WarningError(
-                ErrorCode.ExecutionError,
-                ErrorMessage.ExecutionErrorMessage["unexpectedResult"],
-                "file_path function did not return a valid file path",
-            )
 
         # Remove the temporary directory
         if os.path.exists(temp_dir):

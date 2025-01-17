@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
-import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 
@@ -10,7 +9,6 @@ from jinja2 import Environment, nodes
 from pydantic import BaseModel
 
 from morph.config.project import MorphProject, default_output_paths
-from morph.constants import MorphConstant
 
 from .errors import MorphFunctionLoadError, MorphFunctionLoadErrorCategory
 
@@ -25,7 +23,6 @@ class DirectoryScanResult(BaseModel):
     directory_checksums: Dict[str, str]
     items: List[ScanResult]
     sql_contexts: Dict[str, Any]
-    vg_json_contexts: Dict[str, Any]
     errors: List[MorphFunctionLoadError]
 
 
@@ -41,11 +38,7 @@ def get_checksum(path: Path) -> str:
         return hash_func.hexdigest()
     elif path.is_dir():
         for file in sorted(path.glob("**/*")):
-            if file.is_file() and (
-                file.suffix == ".py"
-                or file.suffix == ".sql"
-                or (str(file)).endswith(".vg.json")
-            ):
+            if file.is_file() and (file.suffix == ".py" or file.suffix == ".sql"):
                 with open(str(file), "rb") as f:
                     for chunk in iter(lambda: f.read(4096), b""):
                         hash_func.update(chunk)
@@ -188,73 +181,6 @@ def _import_sql_file(
         return result, sql_contexts, errors
 
 
-def _import_vg_json_file(
-    file_path: str,
-) -> tuple[ScanResult | None, dict[str, Any], MorphFunctionLoadError | None]:
-    file = Path(file_path)
-    if not file_path.endswith(".vg.json"):
-        return None, {}, None
-
-    module_path = file_path
-    vg_json_contexts: dict[str, Any] = {}
-    result = ScanResult(file_path=file.as_posix(), checksum=get_checksum(file))
-    with open(file_path, "r") as f:
-        content = f.read()
-        errors = None
-        name = None
-        data_requirements = None
-
-        try:
-            data = json.loads(content)
-            name = data["morph_name"] if "morph_name" in data else None
-            data_requirements_ = (
-                data["data"]["name"]
-                if "data" in data and "name" in data["data"]
-                else None
-            )
-            if data_requirements_ and str(data_requirements_).startswith("morph::"):
-                data_requirements = [str(data_requirements_).replace("morph::", "")]
-        except json.JSONDecodeError as e:  # noqa
-            return (
-                None,
-                {},
-                MorphFunctionLoadError(
-                    category=MorphFunctionLoadErrorCategory.IMPORT_ERROR,
-                    file_path=module_path,
-                    name=file.stem,
-                    error="JSON decode error.",
-                ),
-            )
-
-        if name is None:
-            return (
-                None,
-                {},
-                MorphFunctionLoadError(
-                    category=MorphFunctionLoadErrorCategory.IMPORT_ERROR,
-                    file_path=module_path,
-                    name=file.stem,
-                    error="morph_name is not defined.",
-                ),
-            )
-
-        vg_json_contexts.update(
-            {
-                module_path: {
-                    "id": module_path,
-                    "name": name,
-                    "description": None,
-                    "output_paths": None,
-                    "output_type": None,
-                    "variables": None,
-                    "data_requirements": data_requirements,
-                }
-            }
-        )
-
-        return result, vg_json_contexts, errors
-
-
 def import_files(
     project: Optional[MorphProject],
     directory: str,
@@ -288,7 +214,6 @@ def import_files(
 
     directory_checksums: dict[str, str] = {}
     sql_contexts: Dict[str, Any] = {}
-    vg_json_contexts: Dict[str, Any] = {}
     for search_path in search_paths:
         for file in search_path.glob("**/*.py"):
             if any(ignore_dir in file.parts for ignore_dir in ignore_dirs):
@@ -312,18 +237,6 @@ def import_files(
             if error is not None:
                 errors.append(error)
 
-        for file in search_path.glob("**/*.vg.json"):
-            if any(ignore_dir in file.parts for ignore_dir in ignore_dirs):
-                continue
-
-            module_path = file.as_posix()
-            result, context, error = _import_vg_json_file(module_path)
-            if result is not None:
-                results.append(result)
-                vg_json_contexts.update(context)
-            if error is not None:
-                errors.append(error)
-
         directory_checksums[search_path.as_posix()] = get_checksum(search_path)
 
     return DirectoryScanResult(
@@ -331,7 +244,6 @@ def import_files(
         directory_checksums=directory_checksums,
         items=results,
         sql_contexts=sql_contexts,
-        vg_json_contexts=vg_json_contexts,
         errors=errors,
     )
 

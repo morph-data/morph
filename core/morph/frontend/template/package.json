@@ -1,14 +1,12 @@
 {
-  "name": "vite",
+  "name": "morph-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "pre-build": "node pre-build.js",
-    "build": "npm run pre-build && tsc -b && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "dev": "vite --port",
+    "build": "tsc -b && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -23,7 +21,7 @@
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.15.0",
     "@typescript-eslint/parser": "^7.15.0",
-    "@use-morph/page": "^0.5.0-beta.16",
+    "@use-morph/components": "0.1.0-beta.5",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "class-variance-authority": "^0.7.1",
     "eslint": "^8.57.0",

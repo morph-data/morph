@@ -1,8 +1,7 @@
 import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
-import path, { resolve } from "path";
+import { resolve } from "path";
 import ViteRestart from "vite-plugin-restart";
-import { PAGES_GLOB_BASE_DIR_PATH_FROM_FRONTEND_ROOT } from "./constants";
 
 import mdx from "@mdx-js/rollup";
 import remarkGfm from "remark-gfm";
@@ -15,14 +14,10 @@ function addImportToMDX(): Plugin {
     transform(code, id) {
       // onnly mdx
       if (id.endsWith(".mdx")) {
-        if (
-          !code.includes(
-            "import { variable, value, morphValue, getJsonStore as getJson } from '@use-morph/page'"
-          )
-        ) {
+        if (!code.includes("import { state } from '@use-morph/components'")) {
           // add import
           return {
-            code: `import { variable, value, morphValue, getJsonStore as getJson } from '@use-morph/page';\n${code}`,
+            code: `import { state } from '@use-morph/components';\n${code}`,
             map: null,
           };
         }
@@ -48,24 +43,21 @@ export default defineConfig((env) => ({
     },
     addImportToMDX(),
     ViteRestart({
-      restart: [PAGES_GLOB_BASE_DIR_PATH_FROM_FRONTEND_ROOT],
+      restart: ["../../src/pages/**/*"],
     }),
   ],
   base: env.mode === "development" ? "" : "/_vite-static",
   server: {
     host: "0.0.0.0",
-    port: 3000,
     open: false,
     watch: {
       usePolling: true,
       disableGlobbing: false,
     },
-    origin: env.mode === "development" ? "http://0.0.0.0:3000" : "",
   },
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),
-      "/main.js": path.resolve(__dirname, "src/main.tsx"),
     },
   },
   build: {
@@ -75,7 +67,7 @@ export default defineConfig((env) => ({
     manifest: "manifest.json",
     rollupOptions: {
       input: {
-        main: resolve("./src/main-prod.tsx"),
+        main: resolve("./src/main.tsx"),
       },
       output: {
         entryFileNames: `assets/bundle.js`,

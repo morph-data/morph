@@ -1,11 +1,9 @@
 import "vite/modulepreload-polyfill";
 import { createRoot } from "react-dom/client";
 import { createInertiaApp } from "@inertiajs/react";
-import "./index.css";
 import React, { StrictMode } from "react";
 import { PageSkeleton } from "./page-skeleton.tsx";
-import { PageProvider } from "@use-morph/page";
-import "@use-morph/page/css";
+import "@use-morph/components/css";
 import { MDXComponents } from "mdx/types";
 import { customMDXComponents } from "./custom-mdx-components.tsx";
 
@@ -19,17 +17,19 @@ export type MDXComponent = (props: MDXProps) => JSX.Element;
 type PageModule = { default: MDXComponent }; // types MDX default export
 type Pages = Record<string, PageModule>;
 
-const pagesGlobBasePath = "PAGES_GLOB_BASE_DIR_PATH";
-
 const pages: Pages = import.meta.glob<true, string, PageModule>(
-  "PAGES_GLOB_BASE_PATH",
-  { eager: true }
+  "/../../src/pages/**/*.mdx",
+  {
+    eager: true,
+  }
 );
 
 const normalizePath = (filePath: string) => {
+  // const relativePath = filePath.replace(/\.mdx$/, "").replace(/^\.\/pages/, "");
   const relativePath = filePath
-    .replace(pagesGlobBasePath, "")
-    .replace(/\.mdx$/, "");
+    .replace(/\.mdx$/, "")
+    .replace(/^\.\.\/\.\.\/src\/pages/, "");
+
   return relativePath === "/index" ? "/" : relativePath;
 };
 
@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (name === "404") {
         return import("./error-page.tsx").then((module) => module.ErrorPage);
       }
-      const pageModule = pages[`PAGES_PATH`];
+      const pageModule = pages[`../../src/pages/${name}.mdx`];
 
       if (!pageModule) {
         return import("./error-page.tsx").then((module) => module.ErrorPage);
@@ -62,15 +62,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const Page = pageModule.default;
 
-      const WrappedComponent: React.FC = (props: {
-        token?: string;
-        baseUrl?: string;
-      }) => (
-        <PageProvider {...props}>
-          <PageSkeleton routes={routes} title={name}>
-            <Page components={customMDXComponents} />
-          </PageSkeleton>
-        </PageProvider>
+      const WrappedComponent: React.FC = () => (
+        <PageSkeleton routes={routes} title={name}>
+          <Page components={customMDXComponents} />
+        </PageSkeleton>
       );
 
       return WrappedComponent;

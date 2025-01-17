@@ -165,13 +165,8 @@ def sync(
 
 
 @cli.command("serve")
-@params.port
-@params.host
-@params.restart
 @params.workdir
-@params.stop
-@params.build
-@params.no_log
+@params.preview
 @click.pass_context
 @global_flags
 @requires.preflight
