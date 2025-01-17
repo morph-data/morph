@@ -1,4 +1,6 @@
 import os
+import pty
+import re
 import shutil
 import subprocess
 import sys
@@ -122,7 +124,7 @@ class DeployTask(BaseTask):
 
         # 2. Build the Docker image
         click.echo(click.style("Building Docker image...", fg="blue"))
-        self._build_docker_image()
+        image_build_log = self._build_docker_image()
 
         # 3. Save Docker image as .tar
         click.echo(click.style("Saving Docker image as .tar...", fg="blue"))
@@ -136,7 +138,7 @@ class DeployTask(BaseTask):
         try:
             initialize_resp = self.client.initiate_deployment(
                 project_id=self.client.project_id,
-                image_build_log="",  # TODO: capture Docker build logs
+                image_build_log=image_build_log,
                 image_checksum=image_checksum,
             )
         except Exception as e:
@@ -324,9 +326,11 @@ class DeployTask(BaseTask):
             click.echo(click.style(f"Unexpected error: {str(e)}", fg="red"))
             sys.exit(1)
 
-    def _build_docker_image(self):
+    def _build_docker_image(self) -> str:
         """
-        Builds the Docker image using the local Dockerfile.
+        Builds the Docker image using the local Dockerfile and streams the build logs to stdout
+        The saved logs will be plain text (without TTY formatting).
+        @return: Docker build logs as plain text.
         """
         try:
             docker_build_cmd = [
@@ -340,14 +344,70 @@ class DeployTask(BaseTask):
             ]
             if self.no_cache:
                 docker_build_cmd.append("--no-cache")
-            subprocess.run(docker_build_cmd, check=True)
+
+            # Create a pseudo-terminal to preserve Docker's formatted output
+            master_fd, slave_fd = pty.openpty()
+
+            # Run the Docker build command
+            process = subprocess.Popen(
+                docker_build_cmd,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                text=True,
+            )
+
+            # Close the slave side of the PTY
+            os.close(slave_fd)
+
+            build_logs = []
+            ansi_escape = re.compile(
+                r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])"
+            )  # Regex to strip ANSI sequences
+
+            while True:
+                try:
+                    # Read from the master PTY
+                    output = os.read(master_fd, 1024).decode()
+                    if not output:
+                        break
+                    # Stream the formatted output to stdout
+                    sys.stdout.write(output)
+                    sys.stdout.flush()
+                    # Append plain text (without ANSI escape codes) to build_logs
+                    build_logs.append(ansi_escape.sub("", output))
+                except OSError:
+                    break
+            process.wait()
+
+            # Close the master side of the PTY
+            os.close(master_fd)
+
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    process.returncode, docker_build_cmd, output="".join(build_logs)
+                )
+
             click.echo(
                 click.style(
                     f"Docker image '{self.image_name}' built successfully.", fg="green"
                 )
             )
+            # Return the captured plain text logs as a string
+            return "".join(build_logs)
         except subprocess.CalledProcessError as e:
-            click.echo(click.style(f"Error building Docker image: {str(e)}", fg="red"))
+            click.echo(
+                click.style(
+                    f"Error building Docker image: {e.output or str(e)}", fg="red"
+                )
+            )
+            sys.exit(1)
+        except Exception as e:
+            click.echo(
+                click.style(
+                    f"Unexpected error while building Docker image: {str(e)}", fg="red"
+                )
+            )
             sys.exit(1)
 
     def _save_docker_image(self):
