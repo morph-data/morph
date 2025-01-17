@@ -69,6 +69,7 @@ class MorphApiBaseClient(ABC):
         path: str,
         data: Optional[Dict[str, Any]] = None,
         query: Optional[Dict[str, Any]] = None,
+        is_debug: Optional[bool] = False,
     ) -> MorphClientResponse:
         headers = self.get_headers()
         url = urllib.parse.urljoin(f"{self.get_base_url()}/", path)
@@ -85,8 +86,20 @@ class MorphApiBaseClient(ABC):
             url_parts[4] = urllib.parse.urlencode(existing_query)
             url = urllib.parse.urlunparse(url_parts)
 
+        if is_debug:
+            print(">> DEBUGGING REQUEST ==============================")
+            print(f"URL: {url}")
+            print(f"Headers: {headers}")
+            print(f"Data: {data}")
+            print(f"Query: {query}")
+
         response = requests.request(
             method=method, url=url, headers=headers, json=data, verify=True
         )
+
+        if is_debug:
+            print(">> DEBUGGING RESPONSE =============================")
+            print(f"Status Code: {response.status_code}")
+            print(f"Response: {response.json()}")
 
         return MorphClientResponse(response)

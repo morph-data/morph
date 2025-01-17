@@ -4,7 +4,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import click
 import requests
@@ -97,8 +97,9 @@ class DeployTask(BaseTask):
 
         # Verify environment variables
         self.env_file = os.path.join(self.project_root, ".env")
+        self.should_override_env = False
         if os.path.exists(self.env_file):
-            self._verify_environment_variables()
+            self.should_override_env = self._verify_environment_variables()
 
     def run(self):
         """
@@ -178,7 +179,8 @@ class DeployTask(BaseTask):
         self._execute_deployment(user_function_deployment_id)
 
         # 8. Override environment variables
-        self._override_env_variables()
+        if self.should_override_env:
+            self._override_env_variables()
 
         click.echo(click.style("Deployment completed successfully! 🎉", fg="green"))
 
@@ -249,7 +251,7 @@ class DeployTask(BaseTask):
             )
             sys.exit(1)
 
-    def _verify_environment_variables(self) -> None:
+    def _verify_environment_variables(self) -> bool:
         # Check environment variables in the Morph Cloud
         try:
             env_vars_resp = self.client.list_env_vars()
@@ -270,11 +272,9 @@ class DeployTask(BaseTask):
 
         items = env_vars_resp.json().get("items")
         if not items:
-            return
-
-        # TODO: Remove debug print
-        print("==================== FOR DEBUGGING ====================")
-        print(items)
+            # No environment variables in the Morph Cloud
+            # In this case, there is no need to warn the user
+            return True
 
         click.echo(
             click.style(
@@ -290,6 +290,8 @@ class DeployTask(BaseTask):
         ):
             click.echo(click.style("Aborted!"))
             sys.exit(1)
+
+        return True
 
     def _copy_and_build_source(self):
         try:
@@ -461,6 +463,11 @@ class DeployTask(BaseTask):
         @param self:
         @return:
         """
+        click.echo(
+            click.style("Overriding Morph cloud environment variables...", fg="blue"),
+            nl=False,
+        )
+
         env_vars: List[EnvVarObject] = []
         with open(self.env_file, "r") as f:
             for line in f:
@@ -492,7 +499,10 @@ class DeployTask(BaseTask):
             click.echo(click.style(" done!", fg="green"))
 
     def _execute_deployment(
-        self, user_function_deployment_id: str, timeout: int = 900
+        self,
+        user_function_deployment_id: str,
+        timeout: int = 900,
+        enable_status_polling: Optional[bool] = False,
     ) -> None:
         """
         Executes the deployment and monitors its status until completion.
@@ -500,13 +510,14 @@ class DeployTask(BaseTask):
         Args:
             user_function_deployment_id (str): The deployment ID to monitor.
             timeout (int): Maximum time to wait for status change (in seconds). Default is 15 minutes.
+            enable_status_polling (bool): Enable status polling. Default is False.
         """
         start_time = time.time()
         interval = 5  # Initial polling interval in seconds
 
         click.echo(
             click.style(
-                f"Monitoring deployment status... (user_function_deployment_id: {user_function_deployment_id})",
+                f"Deployment started. (user_function_deployment_id: {user_function_deployment_id})",
                 fg="blue",
             )
         )
@@ -525,10 +536,24 @@ class DeployTask(BaseTask):
             click.echo(click.style(f"Error executing deployment: {str(e)}", fg="red"))
             sys.exit(1)
 
+        if not enable_status_polling:
+            status = execute_resp.json().get("status")
+            if status == "succeeded":
+                return
+
+        click.echo(
+            click.style(
+                "Monitoring deployment status...",
+                fg="blue",
+            ),
+            nl=False,
+        )
+
         # Monitor the deployment status
         while True:
             elapsed_time = time.time() - start_time
             if elapsed_time > timeout:
+                click.echo("")
                 click.echo(
                     click.style(
                         "Timeout: Deployment did not finish within the allotted time.",
@@ -543,6 +568,7 @@ class DeployTask(BaseTask):
                     user_function_deployment_id
                 )
                 if status_resp.is_error():
+                    click.echo("")
                     click.echo(
                         click.style(
                             f"Error fetching deployment status: {status_resp.text}",
@@ -553,22 +579,29 @@ class DeployTask(BaseTask):
 
                 status = status_resp.json().get("status")
                 if not status:
+                    click.echo("")
                     click.echo(
                         click.style("Error: No 'status' in the response.", fg="red")
                     )
                     sys.exit(1)
 
-                click.echo(click.style(f"Current status: {status}", fg="yellow"))
-
                 # Check for final states
                 if status in ["succeeded", "failed"]:
                     if status == "succeeded":
-                        click.echo(click.style("Deployment succeeded! 🎉", fg="green"))
+                        click.echo(click.style(" done!", fg="green"))
+                        return
                     else:
-                        click.echo(click.style("Deployment failed. 💔", fg="red"))
-                    break
+                        click.echo("")
+                        click.echo(
+                            click.style(
+                                f"Deployment failed: {status_resp.json().get('message')}",
+                                fg="red",
+                            )
+                        )
+                        sys.exit(1)
 
             except Exception as e:
+                click.echo("")
                 click.echo(
                     click.style(f"Error fetching deployment status: {str(e)}", fg="red")
                 )
