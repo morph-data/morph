@@ -17,6 +17,8 @@ import {
   SelectSeparator,
   SelectItems,
   StateValue,
+  DatePicker,
+  DateRangePicker,
 } from "@use-morph/components";
 import { MDXComponents } from "mdx/types";
 
@@ -39,4 +41,6 @@ export const customMDXComponents: MDXComponents = {
   Accordion,
   Callout,
   LLM,
+  DatePicker,
+  DateRangePicker,
 };
