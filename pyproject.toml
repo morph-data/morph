@@ -108,6 +108,7 @@ pydantic = {extras = ["mypy"], version = "^2.8.2"}
 pandas-stubs = "^2.2.2.240603"
 types-pyyaml = "^6.0.12.20240311"
 types-paramiko = "^3.4.0.20240423"
+types-tabulate = "^0.9.0.20241207"
 
 [tool.poetry.scripts]
 morph = "morph.cli.main:cli"

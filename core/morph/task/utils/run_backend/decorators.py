@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 import inspect
-import os
 from functools import wraps
 from typing import Any, Callable, List, Literal, Optional, TypeVar
 
 from typing_extensions import ParamSpec
 
-from morph.config.project import load_project
-from morph.constants import MorphConstant
+from morph.config.project import default_output_paths
 from morph.task.utils.knowledge.inspection import (
     MorphKnowledgeMetaObjectGlossaryTerm,
     MorphKnowledgeMetaObjectSchema,
 )
 from morph.task.utils.morph import find_project_root_dir
-
 from .state import MorphFunctionMetaObject, MorphGlobalContext
 
 Param = ParamSpec("Param")
@@ -39,7 +36,6 @@ def func(
     title: str | None = None,
     schemas: list[MorphKnowledgeMetaObjectSchema] | None = None,
     terms: list[MorphKnowledgeMetaObjectGlossaryTerm] | None = None,
-    output_paths: list[str] | None = None,
     output_type: Optional[
         Literal["dataframe", "csv", "visualization", "markdown", "json"]
     ] = None,
@@ -50,7 +46,6 @@ def func(
     name = alias or name
 
     context = MorphGlobalContext.get_instance()
-    project = load_project(find_project_root_dir())
 
     def decorator(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
         fid = _get_morph_function_id(func)
@@ -66,25 +61,6 @@ def func(
         if not isinstance(connection, (str, type(None))):
             connection = None
 
-        output_paths_ = output_paths
-        if project and project.output_paths and len(project.output_paths) > 0:
-            project_output_paths: List[str] = []
-            for project_output_path in project.output_paths:
-                if (
-                    os.path.isdir(project_output_path)
-                    and "ext()" not in project_output_path
-                ):
-                    project_output_paths.append(
-                        f"{project_output_path}/{{name}}/{{run_id}}{{ext()}}"
-                    )
-            output_paths_ = (
-                project_output_paths if len(project_output_paths) > 0 else output_paths_
-            )
-        if output_paths_ is None:
-            output_paths_ = [
-                f"{MorphConstant.TMP_MORPH_DIR}/{{name}}/{{run_id}}{{ext()}}"
-            ]
-
         meta_obj = MorphFunctionMetaObject(
             id=fid,
             name=name or func.__name__,
@@ -95,7 +71,7 @@ def func(
             terms=terms,
             variables=variables,
             data_requirements=data_requirements,
-            output_paths=output_paths_,
+            output_paths=default_output_paths(),
             output_type=output_type,
             connection=connection,
             result_cache_ttl=result_cache_ttl,
