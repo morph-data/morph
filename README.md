@@ -2,7 +2,7 @@
 
 ## Features
 
-**Morph** is a python-centric full-stack framework for building and deploying data apps.
+[Morph](https://www.morph-data.io/) is a python-centric full-stack framework for building and deploying data apps.
 
 - **Fast to start** 🚀 - Allows you to get up and running with just three commands.
 - **Deploy and operate 🌐** - Easily deploy your data apps and manage them in production. Managed cloud is available for user authentication and secure data connection.
@@ -17,7 +17,7 @@
 pip install morph-data
 ```
 
-1. Create a new project
+2. Create a new project
 
 ```bash
 morph new
@@ -115,6 +115,13 @@ Morph is a full-stack framework for building data apps using Python, SQL and MDX
 ## Documentation
 
 Visit https://docs.morph-data.io for more documentation.
+
+## Contributing
+
+Thanks for your interest in helping improve Morph ❤️
+
+- Before contributing, please read the [CONTRIBUTING.md](CONTRIBUTING.md).
+- If you find any issues, please let us know and open [an issue](https://github.com/morph-data/morph/issues/new/choose).
 
 ## Lisence
 

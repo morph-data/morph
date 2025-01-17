@@ -1,4 +1,4 @@
-name: 🐞 Bug
+name: 🐞 Bug Report
 description: Report a bug or an issue you've found with Morph
 title: "[Bug] <title>"
 labels: ["bug"]
