@@ -14,14 +14,10 @@ function addImportToMDX(): Plugin {
     transform(code, id) {
       // onnly mdx
       if (id.endsWith(".mdx")) {
-        if (
-          !code.includes(
-            "import { variable, value, morphValue, getJsonStore as getJson } from '@use-morph/page'"
-          )
-        ) {
+        if (!code.includes("import { state } from '@use-morph/components'")) {
           // add import
           return {
-            code: `import { variable, value, morphValue, getJsonStore as getJson } from '@use-morph/page';\n${code}`,
+            code: `import { state } from '@use-morph/components';\n${code}`,
             map: null,
           };
         }

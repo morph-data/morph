@@ -51,14 +51,14 @@ def run_file_with_type_service(
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
     resource = context.search_meta_object_by_name(input.name)
     if resource is None:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
     db_manager = SqliteDBManager(project_root)
@@ -175,14 +175,14 @@ def run_file_service(input: RunFileService) -> SuccessResponse:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
     resource = context.search_meta_object_by_name(input.name)
     if resource is None:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
     db_manager = SqliteDBManager(project_root)
@@ -252,7 +252,7 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}",
+            f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
     with click.Context(click.Command(name="")) as ctx:
@@ -364,16 +364,8 @@ async def file_upload_service(input: UploadFileService) -> Any:
 
         # Retrieve the saved file path from the output
         output_file = ast.literal_eval(run_result["outputs"])[0] if run_result else None
-        print(output_file)
         with open(output_file, "r") as f:
             saved_filepath = f.read()
-
-        if not os.path.isfile(saved_filepath):
-            raise WarningError(
-                ErrorCode.ExecutionError,
-                ErrorMessage.ExecutionErrorMessage["unexpectedResult"],
-                "file_path function did not return a valid file path",
-            )
 
         # Remove the temporary directory
         if os.path.exists(temp_dir):
