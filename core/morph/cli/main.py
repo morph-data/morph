@@ -147,23 +147,6 @@ def clean(
     return None, True
 
 
-@cli.command("sync")
-@params.verbose
-@click.pass_context
-@global_flags
-@requires.preflight
-@requires.postflight
-def sync(
-    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
-) -> Tuple[Union[Dict[str, Union[str, int, bool]], None], bool]:
-    """Synchronize local morph project with the cloud."""
-    from morph.task.sync import SyncTask
-
-    task = SyncTask(ctx.obj["flags"])
-    results = task.run()
-    return results, True
-
-
 @cli.command("serve")
 @params.workdir
 @params.preview
