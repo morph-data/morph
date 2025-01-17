@@ -3,8 +3,7 @@ import { createRoot } from "react-dom/client";
 import { createInertiaApp } from "@inertiajs/react";
 import React, { StrictMode } from "react";
 import { PageSkeleton } from "./page-skeleton.tsx";
-import { PageProvider } from "@use-morph/page";
-import "@use-morph/page/css";
+import "@use-morph/components/css";
 import { MDXComponents } from "mdx/types";
 import { customMDXComponents } from "./custom-mdx-components.tsx";
 
@@ -63,15 +62,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const Page = pageModule.default;
 
-      const WrappedComponent: React.FC = (props: {
-        token?: string;
-        baseUrl?: string;
-      }) => (
-        <PageProvider {...props}>
-          <PageSkeleton routes={routes} title={name}>
-            <Page components={customMDXComponents} />
-          </PageSkeleton>
-        </PageProvider>
+      const WrappedComponent: React.FC = () => (
+        <PageSkeleton routes={routes} title={name}>
+          <Page components={customMDXComponents} />
+        </PageSkeleton>
       );
 
       return WrappedComponent;

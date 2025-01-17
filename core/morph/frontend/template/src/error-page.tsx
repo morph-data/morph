@@ -1,5 +1,4 @@
 import React from "react";
-// import { Button } from "@use-morph/page";
 
 type ErrorPageProps = React.PropsWithChildren<{
   routes: Array<{ path: string; title: string }>;

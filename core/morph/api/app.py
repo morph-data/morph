@@ -129,10 +129,6 @@ async def handle_other_error(_, exc):
 async def index(inertia: InertiaDep) -> InertiaResponse:
     return await inertia.render(
         "index",
-        {
-            "baseUrl": "/",
-            "token": "dummy",
-        },
     )
 
 
@@ -150,10 +146,6 @@ app.include_router(router)
 async def subpages(full_path: str, inertia: InertiaDep) -> InertiaResponse:
     return await inertia.render(
         full_path,
-        {
-            "baseUrl": "/",
-            "token": "dummy",
-        },
     )
 
 
