@@ -1,16 +1,16 @@
 import ast
 import asyncio
-import io
 import json
 import logging
 import os
 import tempfile
 import time
 import uuid
-from contextlib import redirect_stdout
-from typing import Any
+from pathlib import Path
+from typing import Any, List, cast
 
 import click
+import pydantic
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
@@ -26,11 +26,11 @@ from morph.api.types import (
 from morph.api.utils import convert_file_output, convert_variables_values
 from morph.cli.flags import Flags
 from morph.config.project import load_project
-from morph.task.resource import PrintResourceTask
 from morph.task.run import RunTask
-from morph.task.utils.morph import find_project_root_dir
+from morph.task.utils.morph import Resource, find_project_root_dir
 from morph.task.utils.run_backend.errors import MorphFunctionLoadError
-from morph.task.utils.run_backend.state import MorphGlobalContext
+from morph.task.utils.run_backend.inspection import get_checksum
+from morph.task.utils.run_backend.state import MorphGlobalContext, load_cache
 from morph.task.utils.sqlite import SqliteDBManager
 
 logger = logging.getLogger("uvicorn")
@@ -297,23 +297,77 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
 
 
 def list_resource_service() -> Any:
-    with click.Context(click.Command(name="")) as ctx:
-        ctx.params["ALL"] = True
-        task = PrintResourceTask(Flags(ctx))
+    project_root = find_project_root_dir()
+    try:
+        cache = load_cache(project_root)
+    except (pydantic.ValidationError, json.decoder.JSONDecodeError):
+        cache = None
 
-        output = io.StringIO()
-        with redirect_stdout(output):
-            task.run()
+    output: dict[str, Any] = {}
+    if cache is None:
+        needs_compile = True
+    elif len(cache.errors) > 0:
+        needs_compile = True
+    else:
+        needs_compile = False
+        project = load_project(project_root)
+        if project is not None:
+            source_paths = project.source_paths
+        else:
+            source_paths = []
+        extra_paths: List[str] = []
+        compare_dirs = []
+        if len(source_paths) == 0:
+            compare_dirs.append(Path(project_root))
+        else:
+            for source_path in source_paths:
+                compare_dirs.append(Path(f"{project_root}/{source_path}"))
 
-        result = output.getvalue()
-        try:
-            return json.loads(result)
-        except json.JSONDecodeError:  # noqa
-            raise WarningError(
-                ErrorCode.FileError,
-                ErrorMessage.FileErrorMessage["notFound"],
-                result,
-            )
+        for epath in extra_paths:
+            epath_p = Path(epath)
+            if not epath_p.exists() or not epath_p.is_dir():
+                continue
+            compare_dirs.append(epath_p)
+
+        for compare_dir in compare_dirs:
+            if cache.directory_checksums.get(
+                compare_dir.as_posix(), ""
+            ) != get_checksum(Path(compare_dir)):
+                needs_compile = True
+                break
+
+    if needs_compile or cache is None:
+        context = MorphGlobalContext.get_instance()
+        errors = context.load(project_root)
+        if len(errors) > 0:
+            output["errors"] = [error.model_dump() for error in errors]
+        cache = context.dump()
+    elif cache is not None and len(cache.errors) > 0:
+        output["errors"] = [error.model_dump() for error in cache.errors]
+
+    resource_dicts: list[dict] = []
+    for item in cache.items:
+        # id is formatted as {filename}:{function_name}
+        if not item.spec.id or not item.spec.name:
+            continue
+        filepath = item.spec.id.split(":")[0]
+        resource_item = Resource(
+            alias=item.spec.name,
+            path=filepath,
+            connection=(item.spec.connection if item.spec.connection else None),
+            output_paths=(
+                cast(list, item.spec.output_paths) if item.spec.output_paths else None
+            ),
+            data_requirements=(
+                cast(list, item.spec.data_requirements)
+                if item.spec.data_requirements
+                else None
+            ),
+        )
+        resource_dicts.append(resource_item.model_dump())
+
+    output["resources"] = resource_dicts
+    return output
 
 
 def list_scheduled_jobs_service() -> Any:
