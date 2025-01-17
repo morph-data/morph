@@ -22,13 +22,24 @@ logger.addHandler(handler)
 def parse_sys_argv():
     port = 8080
 
-    args = sys.argv[1:]
-    for i in range(len(args)):
-        if args[i] == "--port" and i + 1 < len(args):
+    filtered_args = []
+    skip_next = False
+    for i, arg in enumerate(sys.argv[1:]):
+        if skip_next:
+            skip_next = False
+            continue
+
+        if arg == "--port" and i + 1 < len(sys.argv):
             try:
-                port = int(args[i + 1])
+                port = int(sys.argv[i + 2])
+                skip_next = True
             except ValueError:
                 port = 8080
+            continue
+
+        filtered_args.append(arg)
+
+    sys.argv = [sys.argv[0]] + filtered_args
 
     return port
 
