@@ -4,11 +4,13 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import click
+import pandas as pd
 import pydantic
 from dotenv import dotenv_values, load_dotenv
+from tabulate import tabulate
 
 from morph.cli.flags import Flags
 from morph.config.project import (
@@ -26,11 +28,7 @@ from morph.task.utils.run_backend.errors import (
     MorphFunctionLoadError,
     logging_file_error_exception,
 )
-from morph.task.utils.run_backend.execution import (
-    RunDagArgs,
-    generate_variables_hash,
-    run_cell,
-)
+from morph.task.utils.run_backend.execution import RunDagArgs, run_cell
 from morph.task.utils.run_backend.output import (
     finalize_run,
     is_async_generator,
@@ -45,13 +43,18 @@ from morph.task.utils.run_backend.state import (
     MorphGlobalContext,
     load_cache,
 )
-from morph.task.utils.sqlite import CliError, RunStatus, SqliteDBManager
+from morph.task.utils.run_backend.types import CliError, RunStatus
 from morph.task.utils.timezone import TimezoneManager
 
 
 class RunTask(BaseTask):
     def __init__(self, args: Flags, mode: Optional[Literal["cli", "api"]] = "cli"):
         super().__init__(args)
+
+        # class state
+        self.final_state: Optional[str] = None
+        self.error: Optional[str] = None
+        self.output_paths: Optional[List[str]] = None
 
         # parse arguments
         filename_or_alias: str = os.path.normpath(args.FILENAME)
@@ -98,10 +101,6 @@ class RunTask(BaseTask):
         save_project(self.project_root, self.project)
         if self.project.project_id is not None:
             os.environ["MORPH_PROJECT_ID"] = self.project.project_id
-
-        # Initialize database
-        self.db_manager = SqliteDBManager(self.project_root)
-        self.db_manager.initialize_database()
 
         context = MorphGlobalContext.get_instance()
         try:
@@ -178,22 +177,7 @@ class RunTask(BaseTask):
         self.resource = resource
         self.ext = os.path.splitext(os.path.basename(self.filename))[1]
         self.cell_alias = str(self.resource.name)
-
-        # Set up run directory
-        self.runs_dir = os.path.normpath(
-            os.path.join(
-                self.project_root,
-                ".morph/runs",
-                self.run_id,
-            )
-        )
-        if not os.path.exists(self.runs_dir):
-            os.makedirs(self.runs_dir)
-
-        # Set up logger
-        log_filename = f"{os.path.splitext(os.path.basename(self.cell_alias))[0]}.log"
-        self.log_path = os.path.join(self.runs_dir, log_filename)
-        self.logger = get_morph_logger(self.log_path)
+        self.logger = get_morph_logger()
 
         # load .env in project root and set timezone
         dotenv_path = os.path.join(self.project_root, ".env")
@@ -213,37 +197,21 @@ class RunTask(BaseTask):
                 tz_manager.set_timezone(desired_tz)
 
     def run(self) -> Any:
-        cached_cell = (
-            self.meta_obj_cache.find_by_name(self.cell_alias)
-            if self.meta_obj_cache
-            else None
-        )
-
-        self.db_manager.insert_run_record(
-            self.run_id,
-            self.cell_alias,
-            self.is_dag,
-            self.log_path,
-            cached_cell.checksum if cached_cell else None,
-            generate_variables_hash(self.vars),
-            self.vars,
-        )
-
         if self.ext != ".sql" and self.ext != ".py":
-            text = "Invalid file type. Please specify a .sql or .py file."
-            self.logger.error(text)
-            finalize_run(
+            self.error = "Invalid file type. Please specify a .sql or .py file."
+            self.logger.error(self.error)
+            self.final_state = RunStatus.FAILED.value
+            self.output_paths = finalize_run(
                 self.project,
-                self.db_manager,
                 self.resource,
                 self.cell_alias,
-                RunStatus.FAILED.value,
+                self.final_state,
                 None,
                 self.logger,
                 self.run_id,
                 CliError(
                     type="general",
-                    details=text,
+                    details=self.error,
                 ),
             )
             return
@@ -259,15 +227,10 @@ class RunTask(BaseTask):
             )
 
             try:
-                dag = (
-                    RunDagArgs(run_id=self.run_id, runs_dir=self.runs_dir)
-                    if self.is_dag
-                    else None
-                )
+                dag = RunDagArgs(run_id=self.run_id) if self.is_dag else None
                 output = run_cell(
                     self.project,
                     self.resource,
-                    self.db_manager,
                     self.vars,
                     self.logger,
                     dag,
@@ -283,14 +246,15 @@ class RunTask(BaseTask):
                         else str(e)
                     )
                     text = f"An error occurred while running the file 💥: {error_txt}"
-                self.logger.error(text)
-                click.echo(click.style(text, fg="red"))
-                finalize_run(
+                self.error = text
+                self.logger.error(self.error)
+                click.echo(click.style(self.error, fg="red"))
+                self.final_state = RunStatus.FAILED.value
+                self.output_paths = finalize_run(
                     self.project,
-                    self.db_manager,
                     self.resource,
                     cell,
-                    RunStatus.FAILED.value,
+                    self.final_state,
                     None,
                     self.logger,
                     self.run_id,
@@ -303,6 +267,16 @@ class RunTask(BaseTask):
                     raise Exception(text)
                 return
 
+            # print preview of the DataFrame
+            if isinstance(output.result, pd.DataFrame):
+                preview = tabulate(
+                    output.result.head().values.tolist(),
+                    headers=output.result.columns.tolist(),
+                    tablefmt="grid",
+                    showindex=True,
+                )
+                self.logger.info("DataFrame preview:\n" + preview)
+
             if (
                 is_stream(output.result)
                 or is_async_generator(output.result)
@@ -311,7 +285,6 @@ class RunTask(BaseTask):
                 if self.mode == "api":
                     return stream_and_write_and_response(
                         self.project,
-                        self.db_manager,
                         self.resource,
                         cell,
                         RunStatus.DONE.value,
@@ -323,7 +296,6 @@ class RunTask(BaseTask):
                 else:
                     stream_and_write(
                         self.project,
-                        self.db_manager,
                         self.resource,
                         cell,
                         RunStatus.DONE.value,
@@ -333,12 +305,12 @@ class RunTask(BaseTask):
                         None,
                     )
             else:
-                finalize_run(
+                self.final_state = RunStatus.DONE.value
+                self.output_paths = finalize_run(
                     self.project,
-                    self.db_manager,
                     self.resource,
                     cell,
-                    RunStatus.DONE.value,
+                    self.final_state,
                     transform_output(self.resource, output.result),
                     self.logger,
                     self.run_id,

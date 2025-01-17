@@ -4,12 +4,12 @@ from typing import Any, Dict, List, Optional
 import yaml
 from pydantic import BaseModel, Field
 
-from morph.constants import MorphConstant
 from morph.task.utils.connection import (
     CONNECTION_TYPE,
     MORPH_DUCKDB_CONNECTION_SLUG,
     MorphConnection,
 )
+from morph.task.utils.morph import find_project_root_dir
 
 
 class Schedule(BaseModel):
@@ -27,17 +27,17 @@ class MorphProject(BaseModel):
     profile: Optional[str] = "default"
     source_paths: List[str] = Field(default_factory=lambda: ["src"])
     default_connection: Optional[str] = MORPH_DUCKDB_CONNECTION_SLUG
-    output_paths: List[str] = Field(
-        default_factory=lambda: [
-            f"{MorphConstant.TMP_MORPH_DIR}/{{name}}/{{run_id}}{{ext()}}"
-        ]
-    )
     scheduled_jobs: Optional[Dict[str, ScheduledJob]] = Field(default=None)
     result_cache_ttl: Optional[int] = Field(default=0)
     project_id: Optional[str] = Field(default=None)
 
     class Config:
         arbitrary_types_allowed = True
+
+
+def default_output_paths() -> List[str]:
+    project_root = find_project_root_dir()
+    return [f"{project_root}/.morph/cache/{{name}}{{ext()}}"]
 
 
 def default_initial_project() -> MorphProject:
