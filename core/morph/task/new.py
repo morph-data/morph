@@ -12,7 +12,6 @@ from morph.constants import MorphConstant
 from morph.task.base import BaseTask
 from morph.task.utils.connection import ConnectionYaml
 from morph.task.utils.run_backend.state import MorphGlobalContext
-from morph.task.utils.sqlite import SqliteDBManager
 
 
 class NewTask(BaseTask):
@@ -51,15 +50,6 @@ class NewTask(BaseTask):
                 src_file = os.path.join(root, template_file)
                 dest_file = os.path.join(target_path, template_file)
                 shutil.copy2(src_file, dest_file)
-
-        db_path = f"{self.project_root}/morph_project.sqlite3"
-        if not os.path.exists(db_path):
-            with open(db_path, "w") as f:
-                f.write("")
-
-        # Initialize the project database
-        db_manager = SqliteDBManager(self.project_root)
-        db_manager.initialize_database()
 
         # Execute the post-setup tasks
         original_working_dir = os.getcwd()

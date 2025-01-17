@@ -13,7 +13,6 @@ from morph.task.base import BaseTask
 from morph.task.utils.morph import Resource, find_project_root_dir
 from morph.task.utils.run_backend.inspection import get_checksum
 from morph.task.utils.run_backend.state import MorphGlobalContext, load_cache
-from morph.task.utils.sqlite import SqliteDBManager
 
 
 class PrintResourceTask(BaseTask):
@@ -44,10 +43,6 @@ class PrintResourceTask(BaseTask):
         except FileNotFoundError as e:
             click.echo(click.style(str(e), fg="red"))
             raise e
-
-        # Initialize SQLite database
-        self.db_manager = SqliteDBManager(self.project_root)
-        self.db_manager.initialize_database()
 
     def run(self):
         try:
