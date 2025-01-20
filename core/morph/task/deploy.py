@@ -1,6 +1,7 @@
 import os
 import pty
 import re
+import select
 import shutil
 import subprocess
 import sys
@@ -327,14 +328,16 @@ class DeployTask(BaseTask):
 
     def _build_docker_image(self) -> str:
         """
-        Builds the Docker image using the local Dockerfile and streams the build logs to stdout
-        The saved logs will be plain text (without TTY formatting).
-        @return: Docker build logs as plain text.
+        Builds the Docker image using a pseudo-terminal (PTY) to preserve colored output.
+        Captures logs in plain text format (with ANSI codes removed) for cloud storage while
+        adding color to local terminal output for better readability.
         """
         try:
             docker_build_cmd = [
                 "docker",
                 "build",
+                "--progress=plain",
+                # Simplifies logs by avoiding line overwrites in cloud logs; removes colors and animations
                 "-t",
                 self.image_name,
                 "-f",
@@ -344,47 +347,79 @@ class DeployTask(BaseTask):
             if self.no_cache:
                 docker_build_cmd.append("--no-cache")
 
-            # Create a pseudo-terminal to preserve Docker's formatted output
+            # Regex to strip ANSI escape sequences for storing logs as plain text
+            ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+            # Create a pseudo-terminal pair
             master_fd, slave_fd = pty.openpty()
 
-            # Run the Docker build command
+            # Spawn the Docker build process with PTY
             process = subprocess.Popen(
                 docker_build_cmd,
                 stdin=slave_fd,
                 stdout=slave_fd,
                 stderr=slave_fd,
-                text=True,
+                text=False,  # Receive raw binary data (not decoded text)
+                bufsize=0,  # No extra buffering
             )
 
-            # Close the slave side of the PTY
+            # The slave FD is not needed after starting the process
             os.close(slave_fd)
 
             build_logs = []
-            ansi_escape = re.compile(
-                r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])"
-            )  # Regex to strip ANSI sequences
 
             while True:
-                try:
-                    # Read from the master PTY
-                    output = os.read(master_fd, 1024).decode()
-                    if not output:
+                # Use select to check if there's data to read from the master FD
+                r, _, _ = select.select([master_fd], [], [], 0.1)
+                if master_fd in r:
+                    # Read up to 1KB from the master FD
+                    try:
+                        chunk = os.read(master_fd, 1024)
+                    except OSError:
+                        # If reading fails, exit the loop
                         break
-                    # Stream the formatted output to stdout
-                    sys.stdout.write(output)
-                    sys.stdout.flush()
-                    # Append plain text (without ANSI escape codes) to build_logs
-                    build_logs.append(ansi_escape.sub("", output))
-                except OSError:
-                    break
-            process.wait()
 
-            # Close the master side of the PTY
+                    if not chunk:
+                        # EOF
+                        break
+
+                    # Remove ANSI codes and store logs for cloud storage
+                    text_chunk = chunk.decode(errors="replace")
+                    clean_text = ansi_escape.sub("", text_chunk)
+                    build_logs.append(clean_text)
+
+                    # Add color to logs for local terminal
+                    colored_chunk = click.style(clean_text, fg="blue")
+                    sys.stdout.write(colored_chunk)
+                    sys.stdout.flush()
+
+                # If the process has exited, read any remaining data
+                if process.poll() is not None:
+                    # Read everything left until EOF
+                    while True:
+                        try:
+                            chunk = os.read(master_fd, 1024)
+                            if not chunk:
+                                break
+                            text_chunk = chunk.decode(errors="replace")
+                            clean_text = ansi_escape.sub("", text_chunk)
+                            build_logs.append(clean_text)
+                            colored_chunk = click.style(clean_text, fg="blue")
+                            sys.stdout.write(colored_chunk)
+                            sys.stdout.flush()
+                        except OSError:
+                            break
+                    break
+
+            # Close the master FD
             os.close(master_fd)
 
-            if process.returncode != 0:
+            return_code = process.wait()
+            if return_code != 0:
+                # If Docker build failed, show the full logs and raise an error
+                all_logs = "".join(build_logs)
                 raise subprocess.CalledProcessError(
-                    process.returncode, docker_build_cmd, output="".join(build_logs)
+                    return_code, docker_build_cmd, output=all_logs
                 )
 
             click.echo(
@@ -392,12 +427,13 @@ class DeployTask(BaseTask):
                     f"Docker image '{self.image_name}' built successfully.", fg="green"
                 )
             )
-            # Return the captured plain text logs as a string
+            # Return the captured logs as plain text
             return "".join(build_logs)
-        except subprocess.CalledProcessError as e:
+
+        except subprocess.CalledProcessError:
             click.echo(
                 click.style(
-                    f"Error building Docker image: {e.output or str(e)}", fg="red"
+                    f"Error building Docker image '{self.image_name}'.", fg="red"
                 )
             )
             sys.exit(1)

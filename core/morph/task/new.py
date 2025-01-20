@@ -1,5 +1,7 @@
+import importlib.metadata
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -52,7 +54,6 @@ class NewTask(BaseTask):
                 shutil.copy2(src_file, dest_file)
 
         # Execute the post-setup tasks
-        original_working_dir = os.getcwd()
         os.chdir(self.project_root)
         self.project_root = (
             os.getcwd()
@@ -70,14 +71,27 @@ class NewTask(BaseTask):
             project.project_id = self.args.PROJECT_ID
 
         # Ask the user to select a package manager
-        project.package_manager = (
-            input("Which package manager do you want to use? (pip/poetry): ")
-            .strip()
-            .lower()
-        )
+        package_manager_options = {
+            "1": "pip",
+            "2": "poetry",
+        }
+        click.echo()
+        click.echo("Select a package manager for your project:")
+        for key, value in package_manager_options.items():
+            click.echo(click.style(f"{key}: {value}", fg="blue"))
 
-        # Default to pip if the input is invalid
-        if project.package_manager not in ["pip", "poetry"]:
+        click.echo(
+            click.style("Enter the number of your choice. (default is ["), nl=False
+        )
+        click.echo(click.style("1: pip", fg="blue"), nl=False)
+        click.echo(click.style("]): "), nl=False)
+        package_manager_choice = input().strip()
+
+        # Validate user input and set the package manager
+        project.package_manager = package_manager_options.get(
+            package_manager_choice, "pip"
+        )
+        if project.package_manager not in package_manager_options.values():
             click.echo(
                 click.style(
                     "Warning: Invalid package manager. Defaulting to 'pip'.",
@@ -93,24 +107,81 @@ class NewTask(BaseTask):
 
         save_project(self.project_root, project)
 
-        os.chdir(original_working_dir)
-
         # Generate the Dockerfile template
         template_dir = Path(__file__).parents[1].joinpath("include")
-        docker_template_file = template_dir.joinpath(
-            f"Dockerfile.{project.package_manager}"
-        )
+        docker_template_file = template_dir.joinpath("Dockerfile")
         if not docker_template_file.exists():
             click.echo(
                 click.style(
                     f"Template file not found: {docker_template_file}", fg="red"
                 )
             )
+            click.echo()
             sys.exit(1)
 
         # Copy the selected Dockerfile to the project directory
         dockerfile_path = os.path.join(self.project_root, "Dockerfile")
         shutil.copy2(docker_template_file, dockerfile_path)
 
+        try:
+            morph_data_version = importlib.metadata.version("morph-data")
+        except importlib.metadata.PackageNotFoundError:
+            morph_data_version = None
+            click.echo(
+                click.style(
+                    "No local 'morph-data' found. Using unpinned (no version).",
+                    fg="yellow",
+                )
+            )
+
+        # Handle dependencies based on package manager
+        if project.package_manager == "poetry":
+            click.echo(click.style("Initializing Poetry...", fg="blue"))
+            try:
+                # Prepare the dependency argument
+                dependency = (
+                    f"morph-data=={morph_data_version}"
+                    if morph_data_version
+                    else "morph-data"
+                )
+
+                # Use poetry init with the --dependency option
+                subprocess.run(
+                    ["poetry", "init", "--no-interaction", "--dependency", dependency],
+                    check=True,
+                )
+
+                click.echo(
+                    click.style(
+                        f"Added 'morph-data' to pyproject.toml with {dependency}.",
+                        fg="green",
+                    )
+                )
+            except subprocess.CalledProcessError as e:
+                click.echo(click.style(f"Poetry initialization failed: {e}", fg="red"))
+                click.echo()
+                sys.exit(1)
+        elif project.package_manager == "pip":
+            click.echo(click.style("Generating requirements.txt...", fg="blue"))
+            requirements_path = os.path.join(self.project_root, "requirements.txt")
+            try:
+                with open(requirements_path, "w") as f:
+                    if morph_data_version:
+                        f.write(f"morph-data=={morph_data_version}\n")
+                    else:
+                        f.write("morph-data\n")
+                click.echo(
+                    click.style(
+                        "Created requirements.txt with 'morph-data'.",
+                        fg="green",
+                    )
+                )
+            except IOError as e:
+                click.echo(
+                    click.style(f"Failed to create requirements.txt: {e}", fg="red")
+                )
+                sys.exit(1)
+
+        click.echo()
         click.echo(click.style("Project setup completed successfully! 🎉", fg="green"))
         return True
