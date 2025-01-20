@@ -67,7 +67,7 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
 
     def find_external_connection(self, connection_slug: str) -> MorphClientResponse:
         path = f"external-connection/{connection_slug}"
-        return self.request(method="GET", path=path)
+        return self.request(method="GET", path=path, is_debug=True)
 
     def list_external_connections(self) -> MorphClientResponse:
         path = "external-connection"
