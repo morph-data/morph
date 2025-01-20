@@ -74,15 +74,12 @@ class MorphFunctionMetaObjectCacheManager:
         if not cls._instance:
             cls._instance = super(MorphFunctionMetaObjectCacheManager, cls).__new__(cls)
             cls._instance._cache = None
-            print("Creating cache manager")
         return cls._instance
 
     def load_cache(self, project_root: str) -> MorphFunctionMetaObjectCache | None:
         if self._cache:
-            print("Returning cache")
             return self._cache
 
-        print("Loading cache")
         cache_path = self._cache_path(project_root)
         if not Path(cache_path).exists():
             return None
@@ -94,7 +91,6 @@ class MorphFunctionMetaObjectCacheManager:
         return self._cache
 
     def dump_cache(self, cache: MorphFunctionMetaObjectCache) -> None:
-        print("Dumping cache")
         self._cache = cache
 
         cache_path = self._cache_path(self._cache.directory)
@@ -110,7 +106,6 @@ class MorphFunctionMetaObjectCacheManager:
 
     @staticmethod
     def _cache_path(directory: str) -> str:
-        print("Getting cache path ", directory)
         return f"{directory}/.morph/meta.json"
 
 

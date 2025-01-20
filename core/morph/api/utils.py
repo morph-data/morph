@@ -1,5 +1,6 @@
 import base64
 import io
+import sys
 from typing import Any, Dict, Literal, Optional, Union
 
 import pandas as pd
@@ -62,3 +63,9 @@ def convert_variables_values(variables: Optional[Dict[str, Any]]) -> Dict[str, A
                 pass
         variables_[k] = v
     return variables_
+
+
+def set_command_args():
+    if len(sys.argv) < 2:
+        sys.argv = ["", "serve"]
+    print("sys.argv", sys.argv)
