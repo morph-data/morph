@@ -10,7 +10,12 @@ from morph.api.error import AuthError, ErrorCode, ErrorMessage
 from morph.task.utils.morph import find_project_root_dir
 
 
-async def auth(authorization: str = Header(default=None)) -> None:
+async def auth(
+    authorization: str = Header(default=None), x_api_key: str = Header(default=None)
+) -> None:
+    if x_api_key is not None:
+        os.environ["MORPH_API_KEY"] = x_api_key
+
     if authorization is None or authorization == "Bearer dummy":
         # "dummy" is set when running in local
         project_root = find_project_root_dir()
