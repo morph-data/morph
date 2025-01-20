@@ -76,10 +76,9 @@ class DeployTask(BaseTask):
         )
         self.frontend_dir = os.path.join(self.project_root, ".morph/frontend")
         self.dist_dir = os.path.join(self.frontend_dir, "dist")
-        self.backend_template_dir = os.path.join(
-            Path(__file__).resolve().parents[1], "api"
-        )
-        self.backend_dir = os.path.join(self.project_root, ".morph/core/morph/api")
+        self.backend_template_dir = os.path.join(Path(__file__).resolve().parents[2])
+
+        self.backend_dir = os.path.join(self.project_root, ".morph/core")
 
         # Docker settings
         self.image_name = f"{os.path.basename(self.project_root)}:latest"

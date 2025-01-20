@@ -12,7 +12,7 @@ WORKDIR /var/task
 
 # Copy source code and dependencies
 COPY .morph/frontend/dist /var/task/.morph/frontend/dist
-COPY .morph/core/morph/api /var/task/core/morph/api
+COPY .morph/core /var/task/core
 
 # Install Python dependencies with pip
 COPY requirements.txt /var/task/

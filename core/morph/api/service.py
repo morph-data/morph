@@ -61,7 +61,7 @@ def run_file_with_type_service(
             f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
-    with click.Context(click.Command(name="")) as ctx:
+    with click.Context(click.Command(name="run")) as ctx:
         ctx.params["FILENAME"] = input.name
         ctx.params["RUN_ID"] = f"{int(time.time() * 1000)}"
         ctx.params["DAG"] = input.use_cache if input.use_cache else False
@@ -177,7 +177,7 @@ def run_file_service(input: RunFileService) -> SuccessResponse:
             f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
-    with click.Context(click.Command(name="")) as ctx:
+    with click.Context(click.Command(name="run")) as ctx:
         run_id = input.run_id if input.run_id else f"{int(time.time() * 1000)}"
         ctx.params["FILENAME"] = input.name
         ctx.params["RUN_ID"] = run_id
@@ -234,7 +234,7 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
             f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
-    with click.Context(click.Command(name="")) as ctx:
+    with click.Context(click.Command(name="run")) as ctx:
         ctx.params.update(
             {
                 "FILENAME": input.name,
