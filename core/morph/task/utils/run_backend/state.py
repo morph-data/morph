@@ -94,7 +94,7 @@ class MorphFunctionMetaObjectCacheManager:
         self._cache = cache
 
         cache_path = self._cache_path(self._cache.directory)
-        if os.access(cache_path, os.W_OK):
+        if os.access(self._cache.directory, os.W_OK):
             if not Path(cache_path).parent.exists():
                 Path(cache_path).parent.mkdir(parents=True)
 
