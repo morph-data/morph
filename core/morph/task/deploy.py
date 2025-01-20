@@ -85,7 +85,6 @@ class DeployTask(BaseTask):
         self.frontend_dir = os.path.join(self.project_root, ".morph/frontend")
         self.dist_dir = os.path.join(self.frontend_dir, "dist")
         self.backend_template_dir = os.path.join(Path(__file__).resolve().parents[2])
-
         self.backend_dir = os.path.join(self.project_root, ".morph/core")
 
         # Docker settings
