@@ -12,7 +12,10 @@ from morph.config.project import load_project
 from morph.task.base import BaseTask
 from morph.task.utils.morph import Resource, find_project_root_dir
 from morph.task.utils.run_backend.inspection import get_checksum
-from morph.task.utils.run_backend.state import MorphGlobalContext, load_cache
+from morph.task.utils.run_backend.state import (
+    MorphFunctionMetaObjectCacheManager,
+    MorphGlobalContext,
+)
 
 
 class PrintResourceTask(BaseTask):
@@ -46,7 +49,7 @@ class PrintResourceTask(BaseTask):
 
     def run(self):
         try:
-            cache = load_cache(self.project_root)
+            cache = MorphFunctionMetaObjectCacheManager().load_cache(self.project_root)
         except (pydantic.ValidationError, json.decoder.JSONDecodeError):
             click.echo(
                 click.style(

@@ -40,8 +40,8 @@ from morph.task.utils.run_backend.output import (
 )
 from morph.task.utils.run_backend.state import (
     MorphFunctionMetaObject,
+    MorphFunctionMetaObjectCacheManager,
     MorphGlobalContext,
-    load_cache,
 )
 from morph.task.utils.run_backend.types import CliError, RunStatus
 from morph.task.utils.timezone import TimezoneManager
@@ -122,7 +122,9 @@ class RunTask(BaseTask):
             )
             errors = context.load(self.project_root)
             context.dump()
-        self.meta_obj_cache = load_cache(self.project_root)
+        self.meta_obj_cache = MorphFunctionMetaObjectCacheManager().load_cache(
+            self.project_root
+        )
 
         if len(errors) > 0:
             if self.mode == "api":
