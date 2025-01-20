@@ -68,4 +68,3 @@ def convert_variables_values(variables: Optional[Dict[str, Any]]) -> Dict[str, A
 def set_command_args():
     if len(sys.argv) < 2:
         sys.argv = ["", "serve"]
-    print("sys.argv", sys.argv)

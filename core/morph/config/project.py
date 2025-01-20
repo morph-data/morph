@@ -40,6 +40,8 @@ class MorphProject(BaseModel):
 
 def default_output_paths() -> List[str]:
     project_root = find_project_root_dir()
+    if not os.access(project_root, os.W_OK):
+        return ["/tmp/.morph/cache/{{name}}{{ext()}}"]
     return [f"{project_root}/.morph/cache/{{name}}{{ext()}}"]
 
 

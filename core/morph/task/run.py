@@ -13,15 +13,9 @@ from dotenv import dotenv_values, load_dotenv
 from tabulate import tabulate
 
 from morph.cli.flags import Flags
-from morph.config.project import (
-    MorphProject,
-    default_initial_project,
-    load_project,
-    save_project,
-)
+from morph.config.project import MorphProject, load_project
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
-from morph.task.utils.connection import MORPH_DUCKDB_CONNECTION_SLUG
 from morph.task.utils.logging import get_morph_logger
 from morph.task.utils.morph import find_project_root_dir
 from morph.task.utils.run_backend.errors import (
@@ -95,10 +89,12 @@ class RunTask(BaseTask):
 
         self.project: Optional[MorphProject] = load_project(find_project_root_dir())
         if self.project is None:
-            self.project = default_initial_project()
-        if self.project.default_connection is None:
-            self.project.default_connection = MORPH_DUCKDB_CONNECTION_SLUG
-        save_project(self.project_root, self.project)
+            click.echo(
+                click.style(
+                    "Error: Could not found morph_project.yml", fg="red", bg="yellow"
+                )
+            )
+            sys.exit(1)  # 1: General errors
         if self.project.project_id is not None:
             os.environ["MORPH_PROJECT_ID"] = self.project.project_id
 
