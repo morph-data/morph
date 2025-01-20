@@ -71,6 +71,13 @@ class DeployTask(BaseTask):
             )
             sys.exit(1)
 
+        # Initialize the Morph API client
+        try:
+            self.client = MorphApiKeyClientImpl()
+        except ValueError as e:
+            click.echo(click.style(f"Error: {str(e)}", fg="red"))
+            sys.exit(1)
+
         # Frontend and backend settings
         self.frontend_template_dir = os.path.join(
             Path(__file__).resolve().parents[1], "frontend", "template"
@@ -90,13 +97,6 @@ class DeployTask(BaseTask):
         # Verify dependencies
         self._verify_dependencies()
 
-        # Initialize the Morph API client
-        try:
-            self.client = MorphApiKeyClientImpl()
-        except ValueError as e:
-            click.echo(click.style(f"Error: {str(e)}", fg="red"))
-            sys.exit(1)
-
         # Verify environment variables
         self.env_file = os.path.join(self.project_root, ".env")
         self.should_override_env = False
@@ -108,16 +108,6 @@ class DeployTask(BaseTask):
         Main entry point for the morph deploy task.
         """
         click.echo(click.style("Initiating deployment sequence...", fg="blue"))
-
-        # Copy app.py (entrypoint for lambda) to .morph directory
-        api_dir = Path(__file__).parents[1].joinpath("api")
-        entrypoint_file = api_dir.joinpath("app.py")
-        if not entrypoint_file.exists():
-            click.echo(
-                click.style(f"Entrypoint file not found: {entrypoint_file}", fg="red")
-            )
-            sys.exit(1)
-        shutil.copy2(entrypoint_file, os.path.join(self.project_root, ".morph/app.py"))
 
         # 1. Build the source code
         self._copy_and_build_source()
@@ -216,13 +206,11 @@ class DeployTask(BaseTask):
                     )
                 )
                 sys.exit(1)
-
         elif self.package_manager == "poetry":
             pyproject_file = os.path.join(self.project_root, "pyproject.toml")
-            poetry_lock_file = os.path.join(self.project_root, "poetry.lock")
-            missing_files = [
-                f for f in [pyproject_file, poetry_lock_file] if not os.path.exists(f)
-            ]
+            requirements_file = os.path.join(self.project_root, "requirements.txt")
+
+            missing_files = [f for f in [pyproject_file] if not os.path.exists(f)]
             if missing_files:
                 click.echo(
                     click.style(
@@ -243,7 +231,36 @@ class DeployTask(BaseTask):
                     )
                 )
                 sys.exit(1)
-
+            # Generate requirements.txt using poetry export
+            click.echo(
+                click.style(
+                    "Exporting requirements.txt from Poetry environment...", fg="blue"
+                )
+            )
+            try:
+                subprocess.run(
+                    [
+                        "poetry",
+                        "export",
+                        "-f",
+                        "requirements.txt",
+                        "-o",
+                        requirements_file,
+                        "--without-hashes",
+                    ],
+                    check=True,
+                )
+                click.echo(
+                    click.style(
+                        f"'requirements.txt' generated successfully at: {requirements_file}",
+                        fg="green",
+                    )
+                )
+            except subprocess.CalledProcessError as e:
+                click.echo(
+                    click.style(f"Error exporting requirements.txt: {str(e)}", fg="red")
+                )
+                sys.exit(1)
         else:
             click.echo(
                 click.style(
@@ -296,9 +313,8 @@ class DeployTask(BaseTask):
         return True
 
     def _copy_and_build_source(self):
+        click.echo(click.style("Building frontend...", fg="blue"))
         try:
-            click.echo(click.style("Building frontend...", fg="blue"))
-
             # Copy the frontend template
             if os.path.exists(self.frontend_dir):
                 shutil.rmtree(self.frontend_dir)  # Remove existing frontend directory
@@ -307,6 +323,19 @@ class DeployTask(BaseTask):
                 self.frontend_template_dir, self.frontend_dir, dirs_exist_ok=True
             )
 
+            # Run npm install and build
+            subprocess.run(["npm", "install"], cwd=self.project_root, check=True)
+            subprocess.run(["npm", "run", "build"], cwd=self.project_root, check=True)
+
+        except subprocess.CalledProcessError as e:
+            click.echo(click.style(f"Error building frontend: {str(e)}", fg="red"))
+            sys.exit(1)
+        except Exception as e:
+            click.echo(click.style(f"Unexpected error: {str(e)}", fg="red"))
+            sys.exit(1)
+
+        click.echo(click.style("Building backend...", fg="blue"))
+        try:
             # Copy the backend template
             if os.path.exists(self.backend_dir):
                 shutil.rmtree(self.backend_dir)  # Remove existing backend directory
@@ -315,12 +344,13 @@ class DeployTask(BaseTask):
                 self.backend_template_dir, self.backend_dir, dirs_exist_ok=True
             )
 
-            # Run npm install and build
-            subprocess.run(["npm", "install"], cwd=self.project_root, check=True)
-            subprocess.run(["npm", "run", "build"], cwd=self.project_root, check=True)
+            # Compile the morph project
+            subprocess.run(
+                ["morph", "compile", "--force"], cwd=self.project_root, check=True
+            )
 
         except subprocess.CalledProcessError as e:
-            click.echo(click.style(f"Error building frontend: {str(e)}", fg="red"))
+            click.echo(click.style(f"Error building backend: {str(e)}", fg="red"))
             sys.exit(1)
         except Exception as e:
             click.echo(click.style(f"Unexpected error: {str(e)}", fg="red"))
