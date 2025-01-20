@@ -35,10 +35,11 @@ router = APIRouter()
 async def vm_run_file_stream(
     name: str,
     body: RunFileStreamRequestBody,
-    authorization: str = Header(...),
+    authorization: str = Header(None),
+    x_api_key: str = Header(None),
 ) -> StreamingResponse:
     try:
-        await auth(authorization)
+        await auth(authorization, x_api_key)
         input = RunFileStreamService(
             name=name,
             variables=body.variables,
