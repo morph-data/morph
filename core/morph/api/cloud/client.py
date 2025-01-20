@@ -33,21 +33,21 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
 
         self.project_id = os.environ.get("MORPH_PROJECT_ID", project.project_id)
 
-        config_path = MorphConstant.MORPH_CRED_PATH
-        if not os.path.exists(config_path):
-            raise ValueError(
-                f"Credential file not found at {config_path}. Please run 'morph init'."
-            )
-        config = configparser.ConfigParser()
-        config.read(config_path)
-        if not config.has_section(project.profile):
-            raise ValueError(
-                f"No profile '{project.profile}' found in the credentials file."
-            )
+        self.api_key = os.environ.get("MORPH_API_KEY", "")
+        if not self.api_key:
+            config_path = MorphConstant.MORPH_CRED_PATH
+            if not os.path.exists(config_path):
+                raise ValueError(
+                    f"Credential file not found at {config_path}. Please run 'morph init'."
+                )
+            config = configparser.ConfigParser()
+            config.read(config_path)
+            if not config.has_section(project.profile):
+                raise ValueError(
+                    f"No profile '{project.profile}' found in the credentials file."
+                )
+            self.api_key = config.get(project.profile, "api_key", fallback="")
 
-        self.api_key = os.environ.get(
-            "MORPH_API_KEY", config.get(project.profile, "api_key", fallback="")
-        )
         if not self.api_key:
             raise ValueError(f"No API key found for profile '{project.profile}'.")
 
