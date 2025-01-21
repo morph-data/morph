@@ -12,7 +12,6 @@ from morph.cli.flags import Flags
 from morph.config.project import default_initial_project, load_project, save_project
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
-from morph.task.utils.connection import ConnectionYaml
 from morph.task.utils.run_backend.state import MorphGlobalContext
 
 
@@ -101,11 +100,6 @@ class NewTask(BaseTask):
                 )
             )
             project.package_manager = "pip"
-
-        connection_yaml = ConnectionYaml.load_yaml()
-        if len(list(connection_yaml.connections.keys())) > 0:
-            default_connection = list(connection_yaml.connections.keys())[0]
-            project.default_connection = default_connection
 
         save_project(self.project_root, project)
 
