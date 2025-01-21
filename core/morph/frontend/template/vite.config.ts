@@ -54,6 +54,7 @@ export default defineConfig((env) => ({
       usePolling: true,
       disableGlobbing: false,
     },
+    cors: true,
   },
   resolve: {
     alias: {
