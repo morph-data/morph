@@ -22,7 +22,11 @@ from morph.api.types import (
     SuccessResponse,
     UploadFileService,
 )
-from morph.api.utils import convert_file_output, convert_variables_values
+from morph.api.utils import (
+    convert_file_output,
+    convert_variables_values,
+    set_command_args,
+)
 from morph.cli.flags import Flags
 from morph.config.project import default_output_paths, load_project
 from morph.task.resource import PrintResourceTask
@@ -61,6 +65,7 @@ def run_file_with_type_service(
             f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
+    set_command_args()
     with click.Context(click.Command(name="")) as ctx:
         ctx.params["FILENAME"] = input.name
         ctx.params["RUN_ID"] = f"{int(time.time() * 1000)}"
@@ -177,6 +182,7 @@ def run_file_service(input: RunFileService) -> SuccessResponse:
             f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
+    set_command_args()
     with click.Context(click.Command(name="")) as ctx:
         run_id = input.run_id if input.run_id else f"{int(time.time() * 1000)}"
         ctx.params["FILENAME"] = input.name
@@ -234,6 +240,7 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
             f"Alias not found {input.name}. Check the console for more detailed error information.",
         )
 
+    set_command_args()
     with click.Context(click.Command(name="")) as ctx:
         ctx.params.update(
             {
@@ -276,6 +283,7 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
 
 
 def list_resource_service() -> Any:
+    set_command_args()
     with click.Context(click.Command(name="")) as ctx:
         ctx.params["ALL"] = True
         task = PrintResourceTask(Flags(ctx))

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Optional
@@ -65,28 +66,47 @@ class MorphFunctionMetaObjectCache(BaseModel):
         return None
 
 
-def _cache_path(directory: str) -> str:
-    return f"{directory}/.morph/meta.json"
+class MorphFunctionMetaObjectCacheManager:
+    _instance: Optional["MorphFunctionMetaObjectCacheManager"] = None
+    _cache: Optional["MorphFunctionMetaObjectCache"] = None
 
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(MorphFunctionMetaObjectCacheManager, cls).__new__(cls)
+            cls._instance._cache = None
+        return cls._instance
 
-def load_cache(project_root: str) -> MorphFunctionMetaObjectCache | None:
-    cache_path = _cache_path(project_root)
-    if not Path(cache_path).exists():
-        return None
+    def load_cache(self, project_root: str) -> MorphFunctionMetaObjectCache | None:
+        if self._cache:
+            return self._cache
 
-    with open(cache_path, "r") as f:
-        data = json.load(f)
+        cache_path = self._cache_path(project_root)
+        if not Path(cache_path).exists():
+            return None
 
-    return MorphFunctionMetaObjectCache.model_validate(data)
+        with open(cache_path, "r") as f:
+            data = json.load(f)
 
+        self._cache = MorphFunctionMetaObjectCache.model_validate(data)
+        return self._cache
 
-def dump_cache(cache: MorphFunctionMetaObjectCache) -> None:
-    cache_path = _cache_path(cache.directory)
-    if not Path(cache_path).parent.exists():
-        Path(cache_path).parent.mkdir(parents=True)
+    def dump_cache(self, cache: MorphFunctionMetaObjectCache) -> None:
+        self._cache = cache
 
-    with open(cache_path, "w") as f:
-        json.dump(cache.model_dump(), f, indent=2)
+        cache_path = self._cache_path(self._cache.directory)
+        if os.access(self._cache.directory, os.W_OK):
+            if not Path(cache_path).parent.exists():
+                Path(cache_path).parent.mkdir(parents=True)
+
+            with open(cache_path, "w") as f:
+                json.dump(self._cache.model_dump(), f, indent=2)
+
+    def get_cache(self) -> MorphFunctionMetaObjectCache | None:
+        return self._cache
+
+    @staticmethod
+    def _cache_path(directory: str) -> str:
+        return f"{directory}/.morph/meta.json"
 
 
 class MorphGlobalContext:
@@ -174,7 +194,7 @@ class MorphGlobalContext:
         if cwd not in sys.path:
             sys.path.append(cwd)
 
-        cache = load_cache(directory)
+        cache = MorphFunctionMetaObjectCacheManager().load_cache(directory)
         if cache is None:
             errors = self.load(directory)
             if len(errors) == 0:
@@ -216,7 +236,7 @@ class MorphGlobalContext:
             self.dump()
             if len(errors) < 1:
                 return errors
-            cache_ = load_cache(directory)
+            cache_ = MorphFunctionMetaObjectCacheManager().load_cache(directory)
             if cache_ is not None:
                 cache = cache_
 
@@ -345,7 +365,8 @@ class MorphGlobalContext:
             items=cache_items,
             errors=scan.errors,
         )
-        dump_cache(cache)
+        MorphFunctionMetaObjectCacheManager().dump_cache(cache)
+
         return cache
 
     def _add_data(self, key: str, value: pd.DataFrame) -> None:

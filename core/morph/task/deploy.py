@@ -1,6 +1,7 @@
 import os
 import pty
 import re
+import select
 import shutil
 import subprocess
 import sys
@@ -70,16 +71,21 @@ class DeployTask(BaseTask):
             )
             sys.exit(1)
 
+        # Initialize the Morph API client
+        try:
+            self.client = MorphApiKeyClientImpl()
+        except ValueError as e:
+            click.echo(click.style(f"Error: {str(e)}", fg="red"))
+            sys.exit(1)
+
         # Frontend and backend settings
         self.frontend_template_dir = os.path.join(
             Path(__file__).resolve().parents[1], "frontend", "template"
         )
         self.frontend_dir = os.path.join(self.project_root, ".morph/frontend")
         self.dist_dir = os.path.join(self.frontend_dir, "dist")
-        self.backend_template_dir = os.path.join(
-            Path(__file__).resolve().parents[1], "api"
-        )
-        self.backend_dir = os.path.join(self.project_root, ".morph/core/morph/api")
+        self.backend_template_dir = os.path.join(Path(__file__).resolve().parents[2])
+        self.backend_dir = os.path.join(self.project_root, ".morph/core")
 
         # Docker settings
         self.image_name = f"{os.path.basename(self.project_root)}:latest"
@@ -89,13 +95,6 @@ class DeployTask(BaseTask):
 
         # Verify dependencies
         self._verify_dependencies()
-
-        # Initialize the Morph API client
-        try:
-            self.client = MorphApiKeyClientImpl()
-        except ValueError as e:
-            click.echo(click.style(f"Error: {str(e)}", fg="red"))
-            sys.exit(1)
 
         # Verify environment variables
         self.env_file = os.path.join(self.project_root, ".env")
@@ -108,16 +107,6 @@ class DeployTask(BaseTask):
         Main entry point for the morph deploy task.
         """
         click.echo(click.style("Initiating deployment sequence...", fg="blue"))
-
-        # Copy app.py (entrypoint for lambda) to .morph directory
-        api_dir = Path(__file__).parents[1].joinpath("api")
-        entrypoint_file = api_dir.joinpath("app.py")
-        if not entrypoint_file.exists():
-            click.echo(
-                click.style(f"Entrypoint file not found: {entrypoint_file}", fg="red")
-            )
-            sys.exit(1)
-        shutil.copy2(entrypoint_file, os.path.join(self.project_root, ".morph/app.py"))
 
         # 1. Build the source code
         self._copy_and_build_source()
@@ -216,13 +205,11 @@ class DeployTask(BaseTask):
                     )
                 )
                 sys.exit(1)
-
         elif self.package_manager == "poetry":
             pyproject_file = os.path.join(self.project_root, "pyproject.toml")
-            poetry_lock_file = os.path.join(self.project_root, "poetry.lock")
-            missing_files = [
-                f for f in [pyproject_file, poetry_lock_file] if not os.path.exists(f)
-            ]
+            requirements_file = os.path.join(self.project_root, "requirements.txt")
+
+            missing_files = [f for f in [pyproject_file] if not os.path.exists(f)]
             if missing_files:
                 click.echo(
                     click.style(
@@ -243,7 +230,36 @@ class DeployTask(BaseTask):
                     )
                 )
                 sys.exit(1)
-
+            # Generate requirements.txt using poetry export
+            click.echo(
+                click.style(
+                    "Exporting requirements.txt from Poetry environment...", fg="blue"
+                )
+            )
+            try:
+                subprocess.run(
+                    [
+                        "poetry",
+                        "export",
+                        "-f",
+                        "requirements.txt",
+                        "-o",
+                        requirements_file,
+                        "--without-hashes",
+                    ],
+                    check=True,
+                )
+                click.echo(
+                    click.style(
+                        f"'requirements.txt' generated successfully at: {requirements_file}",
+                        fg="green",
+                    )
+                )
+            except subprocess.CalledProcessError as e:
+                click.echo(
+                    click.style(f"Error exporting requirements.txt: {str(e)}", fg="red")
+                )
+                sys.exit(1)
         else:
             click.echo(
                 click.style(
@@ -296,23 +312,14 @@ class DeployTask(BaseTask):
         return True
 
     def _copy_and_build_source(self):
+        click.echo(click.style("Building frontend...", fg="blue"))
         try:
-            click.echo(click.style("Building frontend...", fg="blue"))
-
             # Copy the frontend template
             if os.path.exists(self.frontend_dir):
                 shutil.rmtree(self.frontend_dir)  # Remove existing frontend directory
             os.makedirs(self.frontend_dir, exist_ok=True)
             shutil.copytree(
                 self.frontend_template_dir, self.frontend_dir, dirs_exist_ok=True
-            )
-
-            # Copy the backend template
-            if os.path.exists(self.backend_dir):
-                shutil.rmtree(self.backend_dir)  # Remove existing backend directory
-            os.makedirs(self.backend_dir, exist_ok=True)
-            shutil.copytree(
-                self.backend_template_dir, self.backend_dir, dirs_exist_ok=True
             )
 
             # Run npm install and build
@@ -326,16 +333,40 @@ class DeployTask(BaseTask):
             click.echo(click.style(f"Unexpected error: {str(e)}", fg="red"))
             sys.exit(1)
 
+        click.echo(click.style("Building backend...", fg="blue"))
+        try:
+            # Copy the backend template
+            if os.path.exists(self.backend_dir):
+                shutil.rmtree(self.backend_dir)  # Remove existing backend directory
+            os.makedirs(self.backend_dir, exist_ok=True)
+            shutil.copytree(
+                self.backend_template_dir, self.backend_dir, dirs_exist_ok=True
+            )
+
+            # Compile the morph project
+            subprocess.run(
+                ["morph", "compile", "--force"], cwd=self.project_root, check=True
+            )
+
+        except subprocess.CalledProcessError as e:
+            click.echo(click.style(f"Error building backend: {str(e)}", fg="red"))
+            sys.exit(1)
+        except Exception as e:
+            click.echo(click.style(f"Unexpected error: {str(e)}", fg="red"))
+            sys.exit(1)
+
     def _build_docker_image(self) -> str:
         """
-        Builds the Docker image using the local Dockerfile and streams the build logs to stdout
-        The saved logs will be plain text (without TTY formatting).
-        @return: Docker build logs as plain text.
+        Builds the Docker image using a pseudo-terminal (PTY) to preserve colored output.
+        Captures logs in plain text format (with ANSI codes removed) for cloud storage while
+        adding color to local terminal output for better readability.
         """
         try:
             docker_build_cmd = [
                 "docker",
                 "build",
+                "--progress=plain",
+                # Simplifies logs by avoiding line overwrites in cloud logs; removes colors and animations
                 "-t",
                 self.image_name,
                 "-f",
@@ -345,47 +376,79 @@ class DeployTask(BaseTask):
             if self.no_cache:
                 docker_build_cmd.append("--no-cache")
 
-            # Create a pseudo-terminal to preserve Docker's formatted output
+            # Regex to strip ANSI escape sequences for storing logs as plain text
+            ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+            # Create a pseudo-terminal pair
             master_fd, slave_fd = pty.openpty()
 
-            # Run the Docker build command
+            # Spawn the Docker build process with PTY
             process = subprocess.Popen(
                 docker_build_cmd,
                 stdin=slave_fd,
                 stdout=slave_fd,
                 stderr=slave_fd,
-                text=True,
+                text=False,  # Receive raw binary data (not decoded text)
+                bufsize=0,  # No extra buffering
             )
 
-            # Close the slave side of the PTY
+            # The slave FD is not needed after starting the process
             os.close(slave_fd)
 
             build_logs = []
-            ansi_escape = re.compile(
-                r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])"
-            )  # Regex to strip ANSI sequences
 
             while True:
-                try:
-                    # Read from the master PTY
-                    output = os.read(master_fd, 1024).decode()
-                    if not output:
+                # Use select to check if there's data to read from the master FD
+                r, _, _ = select.select([master_fd], [], [], 0.1)
+                if master_fd in r:
+                    # Read up to 1KB from the master FD
+                    try:
+                        chunk = os.read(master_fd, 1024)
+                    except OSError:
+                        # If reading fails, exit the loop
                         break
-                    # Stream the formatted output to stdout
-                    sys.stdout.write(output)
-                    sys.stdout.flush()
-                    # Append plain text (without ANSI escape codes) to build_logs
-                    build_logs.append(ansi_escape.sub("", output))
-                except OSError:
-                    break
-            process.wait()
 
-            # Close the master side of the PTY
+                    if not chunk:
+                        # EOF
+                        break
+
+                    # Remove ANSI codes and store logs for cloud storage
+                    text_chunk = chunk.decode(errors="replace")
+                    clean_text = ansi_escape.sub("", text_chunk)
+                    build_logs.append(clean_text)
+
+                    # Add color to logs for local terminal
+                    colored_chunk = click.style(clean_text, fg="blue")
+                    sys.stdout.write(colored_chunk)
+                    sys.stdout.flush()
+
+                # If the process has exited, read any remaining data
+                if process.poll() is not None:
+                    # Read everything left until EOF
+                    while True:
+                        try:
+                            chunk = os.read(master_fd, 1024)
+                            if not chunk:
+                                break
+                            text_chunk = chunk.decode(errors="replace")
+                            clean_text = ansi_escape.sub("", text_chunk)
+                            build_logs.append(clean_text)
+                            colored_chunk = click.style(clean_text, fg="blue")
+                            sys.stdout.write(colored_chunk)
+                            sys.stdout.flush()
+                        except OSError:
+                            break
+                    break
+
+            # Close the master FD
             os.close(master_fd)
 
-            if process.returncode != 0:
+            return_code = process.wait()
+            if return_code != 0:
+                # If Docker build failed, show the full logs and raise an error
+                all_logs = "".join(build_logs)
                 raise subprocess.CalledProcessError(
-                    process.returncode, docker_build_cmd, output="".join(build_logs)
+                    return_code, docker_build_cmd, output=all_logs
                 )
 
             click.echo(
@@ -393,12 +456,13 @@ class DeployTask(BaseTask):
                     f"Docker image '{self.image_name}' built successfully.", fg="green"
                 )
             )
-            # Return the captured plain text logs as a string
+            # Return the captured logs as plain text
             return "".join(build_logs)
-        except subprocess.CalledProcessError as e:
+
+        except subprocess.CalledProcessError:
             click.echo(
                 click.style(
-                    f"Error building Docker image: {e.output or str(e)}", fg="red"
+                    f"Error building Docker image '{self.image_name}'.", fg="red"
                 )
             )
             sys.exit(1)

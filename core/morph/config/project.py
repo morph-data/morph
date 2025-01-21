@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 from pydantic import BaseModel, Field
 
+from morph.constants import MorphConstant
 from morph.task.utils.connection import (
     CONNECTION_TYPE,
     MORPH_DUCKDB_CONNECTION_SLUG,
@@ -40,6 +41,8 @@ class MorphProject(BaseModel):
 
 def default_output_paths() -> List[str]:
     project_root = find_project_root_dir()
+    if not os.access(project_root, os.W_OK):
+        return [f"{MorphConstant.TMP_MORPH_DIR}/cache/{{name}}{{ext()}}"]
     return [f"{project_root}/.morph/cache/{{name}}{{ext()}}"]
 
 

@@ -1,5 +1,7 @@
+import importlib.metadata
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -17,6 +19,7 @@ from morph.task.utils.run_backend.state import MorphGlobalContext
 class NewTask(BaseTask):
     def __init__(self, args: Flags, project_directory: Optional[str]):
         super().__init__(args)
+        self.is_development = os.environ.get("MORPH_DEVELOPMENT", False)
         self.args = args
 
         if not project_directory:
@@ -52,7 +55,7 @@ class NewTask(BaseTask):
                 shutil.copy2(src_file, dest_file)
 
         # Execute the post-setup tasks
-        original_working_dir = os.getcwd()
+        self.original_dir = os.getcwd()
         os.chdir(self.project_root)
         self.project_root = (
             os.getcwd()
@@ -70,14 +73,27 @@ class NewTask(BaseTask):
             project.project_id = self.args.PROJECT_ID
 
         # Ask the user to select a package manager
-        project.package_manager = (
-            input("Which package manager do you want to use? (pip/poetry): ")
-            .strip()
-            .lower()
-        )
+        package_manager_options = {
+            "1": "pip",
+            "2": "poetry",
+        }
+        click.echo()
+        click.echo("Select a package manager for your project:")
+        for key, value in package_manager_options.items():
+            click.echo(click.style(f"{key}: {value}", fg="blue"))
 
-        # Default to pip if the input is invalid
-        if project.package_manager not in ["pip", "poetry"]:
+        click.echo(
+            click.style("Enter the number of your choice. (default is ["), nl=False
+        )
+        click.echo(click.style("1: pip", fg="blue"), nl=False)
+        click.echo(click.style("]): "), nl=False)
+        package_manager_choice = input().strip()
+
+        # Validate user input and set the package manager
+        project.package_manager = package_manager_options.get(
+            package_manager_choice, "pip"
+        )
+        if project.package_manager not in package_manager_options.values():
             click.echo(
                 click.style(
                     "Warning: Invalid package manager. Defaulting to 'pip'.",
@@ -93,24 +109,116 @@ class NewTask(BaseTask):
 
         save_project(self.project_root, project)
 
-        os.chdir(original_working_dir)
-
         # Generate the Dockerfile template
         template_dir = Path(__file__).parents[1].joinpath("include")
-        docker_template_file = template_dir.joinpath(
-            f"Dockerfile.{project.package_manager}"
-        )
+        docker_template_file = template_dir.joinpath("Dockerfile")
         if not docker_template_file.exists():
             click.echo(
                 click.style(
                     f"Template file not found: {docker_template_file}", fg="red"
                 )
             )
+            click.echo()
             sys.exit(1)
 
         # Copy the selected Dockerfile to the project directory
         dockerfile_path = os.path.join(self.project_root, "Dockerfile")
         shutil.copy2(docker_template_file, dockerfile_path)
 
+        try:
+            morph_data_version = importlib.metadata.version("morph-data")
+        except importlib.metadata.PackageNotFoundError:
+            morph_data_version = None
+            click.echo(
+                click.style(
+                    "No local 'morph-data' found. Using unpinned (no version).",
+                    fg="yellow",
+                )
+            )
+
+        # Handle dependencies based on package manager
+        if project.package_manager == "poetry":
+            click.echo(click.style("Initializing Poetry...", fg="blue"))
+            try:
+                # Prepare the dependency argument
+                if self.is_development:
+                    branch = self._get_current_git_branch() or "develop"
+                    dependency = f"git+https://github.com/morph-data/morph.git@{branch}#egg=morph-data"
+                else:
+                    dependency = (
+                        f"morph-data=={morph_data_version}"
+                        if morph_data_version
+                        else "morph-data"
+                    )
+
+                # Use poetry init with the --dependency option
+                subprocess.run(
+                    ["poetry", "init", "--no-interaction", "--dependency", dependency],
+                    check=True,
+                )
+
+                click.echo(
+                    click.style(
+                        f"Added 'morph-data' to pyproject.toml with {dependency}.",
+                        fg="green",
+                    )
+                )
+            except subprocess.CalledProcessError as e:
+                click.echo(click.style(f"Poetry initialization failed: {e}", fg="red"))
+                click.echo()
+                sys.exit(1)
+        elif project.package_manager == "pip":
+            click.echo(click.style("Generating requirements.txt...", fg="blue"))
+            requirements_path = os.path.join(self.project_root, "requirements.txt")
+            try:
+                with open(requirements_path, "w") as f:
+                    if self.is_development:
+                        branch = self._get_current_git_branch() or "develop"
+                        f.write(
+                            f"git+https://github.com/morph-data/morph.git@{branch}#egg=morph-data\n"
+                        )
+                    else:
+                        if morph_data_version:
+                            f.write(f"morph-data=={morph_data_version}\n")
+                        else:
+                            f.write("morph-data\n")
+                click.echo(
+                    click.style(
+                        "Created requirements.txt with 'morph-data'.",
+                        fg="green",
+                    )
+                )
+            except IOError as e:
+                click.echo(
+                    click.style(f"Failed to create requirements.txt: {e}", fg="red")
+                )
+                sys.exit(1)
+
+        click.echo()
         click.echo(click.style("Project setup completed successfully! 🎉", fg="green"))
         return True
+
+    def _get_current_git_branch(self) -> Optional[str]:
+        """
+        Safely get the current Git branch name.
+
+        Returns:
+            Optional[str]: The current branch name, or None if it cannot be determined.
+        """
+        try:
+            # Run the git command to get the current branch name
+            branch = subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=self.original_dir,
+                text=True,
+            ).strip()
+
+            if branch:
+                return branch
+            return None
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Return None if Git command fails or Git is not installed
+            click.echo(
+                click.style("Warning: Git not found or command failed.", fg="yellow")
+            )
+            return None

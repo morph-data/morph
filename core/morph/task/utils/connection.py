@@ -577,8 +577,7 @@ class ConnectionYaml(BaseModel):
     @staticmethod
     def load_yaml() -> "ConnectionYaml":
         if not ConnectionYaml.is_file_exits():
-            with open(MorphConstant.MORPH_CONNECTION_PATH, "w") as file:
-                yaml.dump({"connections": []}, file)
+            return ConnectionYaml(connections={})
 
         with open(MorphConstant.MORPH_CONNECTION_PATH, "r") as file:
             data = yaml.safe_load(file)
