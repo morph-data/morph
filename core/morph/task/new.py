@@ -19,6 +19,7 @@ from morph.task.utils.run_backend.state import MorphGlobalContext
 class NewTask(BaseTask):
     def __init__(self, args: Flags, project_directory: Optional[str]):
         super().__init__(args)
+        self.is_development = os.environ.get("MORPH_DEVELOPMENT", False)
         self.args = args
 
         if not project_directory:
@@ -54,6 +55,7 @@ class NewTask(BaseTask):
                 shutil.copy2(src_file, dest_file)
 
         # Execute the post-setup tasks
+        self.original_dir = os.getcwd()
         os.chdir(self.project_root)
         self.project_root = (
             os.getcwd()
@@ -139,11 +141,15 @@ class NewTask(BaseTask):
             click.echo(click.style("Initializing Poetry...", fg="blue"))
             try:
                 # Prepare the dependency argument
-                dependency = (
-                    f"morph-data=={morph_data_version}"
-                    if morph_data_version
-                    else "morph-data"
-                )
+                if self.is_development:
+                    branch = self._get_current_git_branch() or "develop"
+                    dependency = f"git+https://github.com/morph-data/morph.git@{branch}#egg=morph-data"
+                else:
+                    dependency = (
+                        f"morph-data=={morph_data_version}"
+                        if morph_data_version
+                        else "morph-data"
+                    )
 
                 # Use poetry init with the --dependency option
                 subprocess.run(
@@ -166,10 +172,16 @@ class NewTask(BaseTask):
             requirements_path = os.path.join(self.project_root, "requirements.txt")
             try:
                 with open(requirements_path, "w") as f:
-                    if morph_data_version:
-                        f.write(f"morph-data=={morph_data_version}\n")
+                    if self.is_development:
+                        branch = self._get_current_git_branch() or "develop"
+                        f.write(
+                            f"git+https://github.com/morph-data/morph.git@{branch}#egg=morph-data\n"
+                        )
                     else:
-                        f.write("morph-data\n")
+                        if morph_data_version:
+                            f.write(f"morph-data=={morph_data_version}\n")
+                        else:
+                            f.write("morph-data\n")
                 click.echo(
                     click.style(
                         "Created requirements.txt with 'morph-data'.",
@@ -185,3 +197,28 @@ class NewTask(BaseTask):
         click.echo()
         click.echo(click.style("Project setup completed successfully! 🎉", fg="green"))
         return True
+
+    def _get_current_git_branch(self) -> Optional[str]:
+        """
+        Safely get the current Git branch name.
+
+        Returns:
+            Optional[str]: The current branch name, or None if it cannot be determined.
+        """
+        try:
+            # Run the git command to get the current branch name
+            branch = subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=self.original_dir,
+                text=True,
+            ).strip()
+
+            if branch:
+                return branch
+            return None
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Return None if Git command fails or Git is not installed
+            click.echo(
+                click.style("Warning: Git not found or command failed.", fg="yellow")
+            )
+            return None
