@@ -6,6 +6,8 @@ import { PageSkeleton } from "./page-skeleton.tsx";
 import "@use-morph/components/css";
 import { MDXComponents } from "mdx/types";
 import { customMDXComponents } from "./custom-mdx-components.tsx";
+import { AdminPage } from "./admin/AdminPage.tsx";
+import { ErrorPage } from "./error-page.tsx";
 
 type MDXProps = {
   children?: React.ReactNode;
@@ -49,22 +51,25 @@ const routes = Object.entries(pages).map(([filePath, module]) => {
 });
 
 document.addEventListener("DOMContentLoaded", () => {
-  createInertiaApp({
+  createInertiaApp<{ showAdminPage: boolean }>({
     resolve: (name) => {
-      if (name === "404") {
-        return import("./error-page.tsx").then((module) => module.ErrorPage);
-      }
       const pageModule = pages[`../../src/pages/${name}.mdx`];
 
-      if (!pageModule) {
-        return import("./error-page.tsx").then((module) => module.ErrorPage);
-      }
-
-      const Page = pageModule.default;
-
-      const WrappedComponent: React.FC = () => (
-        <PageSkeleton routes={routes} title={name}>
-          <Page components={customMDXComponents} />
+      const WrappedComponent: React.FC<{ showAdminPage: boolean }> = ({
+        showAdminPage,
+      }) => (
+        <PageSkeleton
+          routes={routes}
+          title={name}
+          showAdminPage={showAdminPage}
+        >
+          {name === "morph" ? (
+            <AdminPage />
+          ) : pageModule ? (
+            <pageModule.default components={customMDXComponents} />
+          ) : (
+            <ErrorPage routes={routes} />
+          )}
         </PageSkeleton>
       );
 
