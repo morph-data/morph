@@ -102,6 +102,9 @@ class DeployTask(BaseTask):
         if os.path.exists(self.env_file):
             self.should_override_env = self._verify_environment_variables()
 
+        # Validate API key
+        self._validate_api_key()
+
     def run(self):
         """
         Main entry point for the morph deploy task.
@@ -166,12 +169,12 @@ class DeployTask(BaseTask):
         # 6. Upload the tar to the pre-signed URL
         self._upload_image_to_presigned_url(presigned_url, self.output_tar)
 
-        # 7. Execute deployment and monitor status
-        self._execute_deployment(user_function_deployment_id)
-
-        # 8. Override environment variables
+        # 7. Override environment variables
         if self.should_override_env:
             self._override_env_variables()
+
+        # 8. Execute deployment and monitor status
+        self._execute_deployment(user_function_deployment_id)
 
         click.echo(click.style("Deployment completed successfully! 🎉", fg="green"))
 
@@ -310,6 +313,17 @@ class DeployTask(BaseTask):
             sys.exit(1)
 
         return True
+
+    def _validate_api_key(self):
+        res = self.client.check_api_secret()
+        if res.is_error():
+            click.echo(
+                click.style(
+                    "Error: API key is invalid.",
+                    fg="red",
+                )
+            )
+            exit(1)
 
     def _copy_and_build_source(self):
         click.echo(click.style("Building frontend...", fg="blue"))
