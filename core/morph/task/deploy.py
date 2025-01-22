@@ -323,7 +323,7 @@ class DeployTask(BaseTask):
                     fg="red",
                 )
             )
-            exit(1)
+            sys.exit(1)
 
     def _copy_and_build_source(self):
         click.echo(click.style("Building frontend...", fg="blue"))
