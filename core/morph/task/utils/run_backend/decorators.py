@@ -7,11 +7,7 @@ from typing import Any, Callable, List, Literal, Optional, TypeVar
 from typing_extensions import ParamSpec
 
 from morph.config.project import default_output_paths
-from morph.task.utils.knowledge.inspection import (
-    MorphKnowledgeMetaObjectGlossaryTerm,
-    MorphKnowledgeMetaObjectSchema,
-)
-from morph.task.utils.morph import find_project_root_dir
+
 from .state import MorphFunctionMetaObject, MorphGlobalContext
 
 Param = ParamSpec("Param")
@@ -34,8 +30,6 @@ def func(
     name: str | None = None,
     description: str | None = None,
     title: str | None = None,
-    schemas: list[MorphKnowledgeMetaObjectSchema] | None = None,
-    terms: list[MorphKnowledgeMetaObjectGlossaryTerm] | None = None,
     output_type: Optional[
         Literal["dataframe", "csv", "visualization", "markdown", "json"]
     ] = None,
@@ -67,8 +61,6 @@ def func(
             function=func,
             description=description,
             title=title,
-            schemas=schemas,
-            terms=terms,
             variables=variables,
             data_requirements=data_requirements,
             output_paths=default_output_paths(),
@@ -124,8 +116,6 @@ def variables(
                     function=meta.function,
                     description=meta.description,
                     title=meta.title,
-                    schemas=meta.schemas,
-                    terms=meta.terms,
                     variables={
                         **meta.variables,
                         **{
@@ -152,8 +142,6 @@ def variables(
                     function=func,
                     description=None,
                     title=None,
-                    schemas=None,
-                    terms=None,
                     variables={
                         var_name: {
                             "default": default,
@@ -195,8 +183,6 @@ def load_data(
                     function=meta.function,
                     description=meta.description,
                     title=meta.title,
-                    schemas=meta.schemas,
-                    terms=meta.terms,
                     variables=meta.variables,
                     data_requirements=meta.data_requirements + [name],
                     output_paths=meta.output_paths,
@@ -214,8 +200,6 @@ def load_data(
                     function=func,
                     description=None,
                     title=None,
-                    schemas=None,
-                    terms=None,
                     variables=None,
                     data_requirements=[name],
                     output_paths=None,

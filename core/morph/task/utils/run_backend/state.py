@@ -14,10 +14,6 @@ from typing_extensions import Self
 from morph.api.cloud.types import UserInfo
 from morph.api.context import request_context
 from morph.config.project import MorphProject, load_project
-from morph.task.utils.knowledge.inspection import (
-    MorphKnowledgeMetaObjectGlossaryTerm,
-    MorphKnowledgeMetaObjectSchema,
-)
 
 from .errors import MorphFunctionLoadError, MorphFunctionLoadErrorCategory
 from .inspection import (
@@ -35,8 +31,6 @@ class MorphFunctionMetaObject(BaseModel):
     function: Optional[Callable[..., Any]]
     description: Optional[str] = None
     title: Optional[str] = None
-    schemas: Optional[List[MorphKnowledgeMetaObjectSchema]] = []
-    terms: Optional[List[MorphKnowledgeMetaObjectGlossaryTerm]] = []
     variables: Optional[Dict[str, Any]] = {}
     data_requirements: Optional[List[str]] = []
     output_paths: Optional[List[str]] = []
@@ -163,8 +157,6 @@ class MorphGlobalContext:
                 function=value["function"] if "function" in value else None,
                 description=value["description"] if "description" in value else None,
                 title=value["title"] if "title" in value else None,
-                schemas=value["schemas"] if "schemas" in value else [],
-                terms=value["terms"] if "terms" in value else [],
                 variables=value["variables"] if "variables" in value else {},
                 data_requirements=(
                     value["data_requirements"] if "data_requirements" in value else []
@@ -289,8 +281,6 @@ class MorphGlobalContext:
                         value["description"] if "description" in value else None
                     ),
                     title=value["title"] if "title" in value else None,
-                    schemas=value["schemas"] if "schemas" in value else [],
-                    terms=value["terms"] if "terms" in value else [],
                     variables=value["variables"] if "variables" in value else {},
                     data_requirements=(
                         value["data_requirements"]
@@ -404,8 +394,6 @@ class MorphGlobalContext:
             current_obj.output_type = current_obj.output_type or obj.output_type
             current_obj.connection = current_obj.connection or obj.connection
             current_obj.title = current_obj.title or obj.title
-            current_obj.schemas = current_obj.schemas or obj.schemas
-            current_obj.terms = current_obj.terms or obj.terms
             current_obj.result_cache_ttl = (
                 current_obj.result_cache_ttl or obj.result_cache_ttl
             )
