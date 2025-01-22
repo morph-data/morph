@@ -137,7 +137,7 @@ class NewTask(BaseTask):
                 # Prepare the dependency argument
                 if self.is_development:
                     branch = self._get_current_git_branch() or "develop"
-                    dependency = f"git+https://github.com/morph-data/morph.git@{branch}#egg=morph-data"
+                    dependency = f"git+https://github.com/morph-data/morph.git@{branch}"
                 else:
                     dependency = (
                         f"morph-data=={morph_data_version}"
@@ -206,10 +206,7 @@ class NewTask(BaseTask):
                 cwd=self.original_dir,
                 text=True,
             ).strip()
-
-            if branch:
-                return branch
-            return None
+            return branch or None
         except (subprocess.CalledProcessError, FileNotFoundError):
             # Return None if Git command fails or Git is not installed
             click.echo(
