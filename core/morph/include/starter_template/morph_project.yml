@@ -1,5 +1,4 @@
 default_connection: DUCKDB
 result_cache_ttl: 0
-scheduled_jobs: null
 source_paths:
 - src

@@ -28,7 +28,7 @@ from morph.api.utils import (
     set_command_args,
 )
 from morph.cli.flags import Flags
-from morph.config.project import default_output_paths, load_project
+from morph.config.project import default_output_paths
 from morph.task.resource import PrintResourceTask
 from morph.task.run import RunTask
 from morph.task.utils.morph import find_project_root_dir
@@ -301,22 +301,6 @@ def list_resource_service() -> Any:
                 ErrorMessage.FileErrorMessage["notFound"],
                 result,
             )
-
-
-def list_scheduled_jobs_service() -> Any:
-    project_root = find_project_root_dir()
-    project = load_project(project_root)
-    if project is None:
-        raise WarningError(
-            ErrorCode.FileError,
-            ErrorMessage.FileErrorMessage["formatInvalid"],
-            "Failed to load morph_project.yml",
-        )
-
-    if project.scheduled_jobs is None:
-        return []
-
-    return project.scheduled_jobs
 
 
 async def file_upload_service(input: UploadFileService) -> Any:

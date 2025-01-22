@@ -10,7 +10,6 @@ from morph.api.error import AuthError, ErrorCode, ErrorMessage, RequestError
 from morph.api.service import (
     file_upload_service,
     list_resource_service,
-    list_scheduled_jobs_service,
     run_file_service,
     run_file_stream_service,
     run_file_with_type_service,
@@ -147,13 +146,6 @@ def list_resource(
     _: str = Security(auth),
 ) -> Any:
     return list_resource_service()
-
-
-@router.get("/cli/morph-project/scheduled-jobs")
-def list_scheduled_jobs(
-    _: str = Security(auth),
-) -> Any:
-    return list_scheduled_jobs_service()
 
 
 @router.post("/cli/file-upload")
