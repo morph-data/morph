@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -13,22 +13,10 @@ from morph.task.utils.connection import (
 from morph.task.utils.morph import find_project_root_dir
 
 
-class Schedule(BaseModel):
-    cron: str
-    is_enabled: bool = True
-    timezone: str = "UTC"
-    variables: Optional[Dict[str, Any]] = None
-
-
-class ScheduledJob(BaseModel):
-    schedules: List[Schedule]
-
-
 class MorphProject(BaseModel):
     profile: Optional[str] = "default"
     source_paths: List[str] = Field(default_factory=lambda: ["src"])
     default_connection: Optional[str] = MORPH_DUCKDB_CONNECTION_SLUG
-    scheduled_jobs: Optional[Dict[str, ScheduledJob]] = Field(default=None)
     result_cache_ttl: Optional[int] = Field(default=0)
     project_id: Optional[str] = Field(default=None)
     package_manager: str = Field(
