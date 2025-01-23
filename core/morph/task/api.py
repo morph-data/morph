@@ -1,6 +1,5 @@
 import configparser
 import os
-import shutil
 import signal
 import socket
 import subprocess
@@ -15,7 +14,7 @@ from dotenv import dotenv_values, load_dotenv
 from morph.cli.flags import Flags
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
-from morph.task.utils.morph import find_project_root_dir
+from morph.task.utils.morph import find_project_root_dir, initialize_frontend_dir
 from morph.task.utils.timezone import TimezoneManager
 
 
@@ -62,8 +61,8 @@ class ApiTask(BaseTask):
             os.environ["MORPH_API_KEY"] = self.api_key
 
         # load environment variables from .env file
-        project_root = find_project_root_dir()
-        dotenv_path = os.path.join(project_root, ".env")
+        self.project_root = find_project_root_dir()
+        dotenv_path = os.path.join(self.project_root, ".env")
         load_dotenv(dotenv_path)
         env_vars = dotenv_values(dotenv_path)
         for e_key, e_val in env_vars.items():
@@ -83,6 +82,10 @@ class ApiTask(BaseTask):
                 )
             if desired_tz != tz_manager.get_current_timezone():
                 tz_manager.set_timezone(desired_tz)
+
+        # Initialize the frontend directory
+        # Copy the frontend template to ~/.morph/frontend if it doesn't exist
+        self.frontend_dir = initialize_frontend_dir(self.project_root)
 
         # for managing subprocesses
         self.processes: List[subprocess.Popen[str]] = []
@@ -147,18 +150,10 @@ class ApiTask(BaseTask):
             self._signal_handler(None, None)
 
     def _run_frontend(self) -> None:
-        frontend_dir = os.path.join(self.workdir, ".morph", "frontend")
-        if not os.path.exists(frontend_dir):
-            frontend_template_path = (
-                Path(__file__).parents[1].joinpath("frontend", "template")
-            )
-
-            shutil.copytree(frontend_template_path, frontend_dir)
-
         try:
             subprocess.run(
                 "npm install",
-                cwd=frontend_dir,
+                cwd=self.frontend_dir,
                 shell=True,
                 check=True,
             )
@@ -171,7 +166,7 @@ class ApiTask(BaseTask):
         if self.is_preview:
             subprocess.run(
                 ["npm", "run", "build"],
-                cwd=frontend_dir,
+                cwd=self.frontend_dir,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
@@ -181,7 +176,7 @@ class ApiTask(BaseTask):
         else:
             self._run_process(
                 ["npm", "run", "dev", "--port", f"{self.front_port}"],
-                cwd=frontend_dir,
+                cwd=self.frontend_dir,
                 is_debug=False,
             )
 
