@@ -106,6 +106,7 @@ class PostgresqlConnection(BaseModel):
     ssh_user: Optional[str] = None
     ssh_password: Optional[str] = None
     ssh_private_key: Optional[str] = None
+    timezone: Optional[str] = None
 
     model_config = ConfigDict(use_enum_values=True, populate_by_name=True)
 
@@ -705,6 +706,7 @@ class ConnectionYaml(BaseModel):
 
                 connection_string = response_json["maskedUrl"]
                 password = response_json["password"]
+                timezone = response_json["timezone"]
 
                 pattern = re.compile(
                     r"postgresql://(?P<username>[^:]+):(?P<password>[^@]+)@(?P<host>[^/]+)/(?P<database>[^?]+)\?sslmode=require"
@@ -726,6 +728,7 @@ class ConnectionYaml(BaseModel):
                     port=5432,
                     dbname=database,
                     schema="public",
+                    timezone=timezone,
                 )
 
     @staticmethod
