@@ -19,7 +19,7 @@ from morph.cli.flags import Flags
 from morph.config.project import load_project
 from morph.task.base import BaseTask
 from morph.task.utils.file_upload import FileWithProgress
-from morph.task.utils.morph import find_project_root_dir
+from morph.task.utils.morph import find_project_root_dir, initialize_frontend_dir
 
 
 class DeployTask(BaseTask):
@@ -79,11 +79,7 @@ class DeployTask(BaseTask):
             sys.exit(1)
 
         # Frontend and backend settings
-        self.frontend_template_dir = os.path.join(
-            Path(__file__).resolve().parents[1], "frontend", "template"
-        )
-        self.frontend_dir = os.path.join(self.project_root, ".morph/frontend")
-        self.dist_dir = os.path.join(self.frontend_dir, "dist")
+        self.frontend_dir = initialize_frontend_dir(self.project_root)
         self.backend_template_dir = os.path.join(Path(__file__).resolve().parents[2])
         self.backend_dir = os.path.join(self.project_root, ".morph/core")
 
@@ -328,14 +324,6 @@ class DeployTask(BaseTask):
     def _copy_and_build_source(self):
         click.echo(click.style("Building frontend...", fg="blue"))
         try:
-            # Copy the frontend template
-            if os.path.exists(self.frontend_dir):
-                shutil.rmtree(self.frontend_dir)  # Remove existing frontend directory
-            os.makedirs(self.frontend_dir, exist_ok=True)
-            shutil.copytree(
-                self.frontend_template_dir, self.frontend_dir, dirs_exist_ok=True
-            )
-
             # Run npm install and build
             subprocess.run(["npm", "install"], cwd=self.project_root, check=True)
             subprocess.run(["npm", "run", "build"], cwd=self.project_root, check=True)
