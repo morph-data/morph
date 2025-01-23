@@ -5,6 +5,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   Button,
+  DropdownMenuSeparator,
 } from "@use-morph/components";
 import { ErrorBoundary, FallbackProps } from "react-error-boundary";
 import { Link } from "@inertiajs/react";
@@ -22,6 +23,7 @@ function fallbackRender({ error }: FallbackProps) {
 type PageSkeletonProps = React.PropsWithChildren<{
   routes: Array<{ path: string; title: string }>;
   title: string;
+  showAdminPage: boolean;
 }>;
 
 export const PageSkeleton: React.FC<PageSkeletonProps> = (props) => {
@@ -56,6 +58,14 @@ export const PageSkeleton: React.FC<PageSkeletonProps> = (props) => {
                   <DropdownMenuItem>{route.title}</DropdownMenuItem>
                 </Link>
               ))}
+              {props.showAdminPage && (
+                <>
+                  <DropdownMenuSeparator />
+                  <Link href="/morph">
+                    <DropdownMenuItem>Admin Page</DropdownMenuItem>
+                  </Link>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <div className="text-sm text-gray-500">{props.title}</div>

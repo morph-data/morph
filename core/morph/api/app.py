@@ -127,9 +127,7 @@ async def handle_other_error(_, exc):
 
 @app.get("/", response_model=None)
 async def index(inertia: InertiaDep) -> InertiaResponse:
-    return await inertia.render(
-        "index",
-    )
+    return await inertia.render("index", {"showAdminPage": is_local_dev_mode})
 
 
 @app.get(
@@ -142,11 +140,18 @@ async def health_check():
 app.include_router(router)
 
 
+@app.get("/morph", response_model=None)
+async def morph(inertia: InertiaDep) -> InertiaResponse:
+
+    if is_local_dev_mode:
+        return await inertia.render("morph", {"showAdminPage": True})
+
+    return await inertia.render("404", {"showAdminPage": False})
+
+
 @app.get("/{full_path:path}", response_model=None)
 async def subpages(full_path: str, inertia: InertiaDep) -> InertiaResponse:
-    return await inertia.render(
-        full_path,
-    )
+    return await inertia.render(full_path, {"showAdminPage": is_local_dev_mode})
 
 
 handler = Mangum(app)
