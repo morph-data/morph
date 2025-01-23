@@ -8,4 +8,4 @@
 select
     *
 from
-    read_csv("example.csv")
+    read_csv("src/example.csv")

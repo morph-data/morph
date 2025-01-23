@@ -20,7 +20,6 @@ COPY .morph/frontend/dist /var/task/.morph/frontend/dist
 COPY .morph/core /var/task/core
 COPY .morph/meta.json .morph/
 COPY morph_project.yml .
-COPY example.csv .
 COPY src ./src
 
 # Command to run the Lambda function
