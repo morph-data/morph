@@ -54,6 +54,11 @@ class SnowflakeApi:
         warehouse: Optional[str] = None,
         role: Optional[str] = None,
     ) -> SnowflakeExecuteSqlImplResponse:
+        if not account.startswith("http"):
+            account = f"https://{account}"
+        if not account.endswith(".snowflakecomputing.com"):
+            account = f"{account}.snowflakecomputing.com"
+
         url = f"{account}/api/v2/statements"
 
         headers = {
@@ -103,6 +108,11 @@ class SnowflakeApi:
         statement_handle: str,
         partition: Optional[int] = None,
     ) -> SnowflakeExecuteSqlImplResponse:
+        if not account.startswith("http"):
+            account = f"https://{account}"
+        if not account.endswith(".snowflakecomputing.com"):
+            account = f"{account}.snowflakecomputing.com"
+
         url = f"{account}/api/v2/statements/{statement_handle}"
 
         if partition is not None:
@@ -320,11 +330,7 @@ class SnowflakeApi:
     ) -> Tuple[Union[List[Tuple], List[Dict]], List[str]]:
         from snowflake import connector
 
-        account_identifier = account
-        if account_identifier.startswith("http"):
-            start_idx = account_identifier.find("https://") + 8
-            end_idx = account_identifier.find(".snowflakecomputing.com")
-            account_identifier = account_identifier[start_idx:end_idx]
+        account_identifier = SnowflakeApi.get_account_identifier(account)
 
         try:
             conn = connector.connect(
