@@ -30,7 +30,7 @@ export const ResourceDetail = ({ resources }: { resources: Resource[] }) => {
     <div>
       <h2>{selectedAlias}</h2>
       <BasicInfo resources={resources} alias={selectedAlias} />
-      <ScheduledJobs alias={selectedAlias} />
+      {/* <ScheduledJobs alias={selectedAlias} /> */}
     </div>
   );
 };
