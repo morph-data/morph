@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Optional
@@ -13,17 +14,12 @@ from typing_extensions import Self
 from morph.api.cloud.types import UserInfo
 from morph.api.context import request_context
 from morph.config.project import MorphProject, load_project
-from morph.task.utils.knowledge.inspection import (
-    MorphKnowledgeMetaObjectGlossaryTerm,
-    MorphKnowledgeMetaObjectSchema,
-)
 
 from .errors import MorphFunctionLoadError, MorphFunctionLoadErrorCategory
 from .inspection import (
     DirectoryScanResult,
     _import_python_file,
     _import_sql_file,
-    _import_vg_json_file,
     get_checksum,
     import_files,
 )
@@ -35,8 +31,6 @@ class MorphFunctionMetaObject(BaseModel):
     function: Optional[Callable[..., Any]]
     description: Optional[str] = None
     title: Optional[str] = None
-    schemas: Optional[List[MorphKnowledgeMetaObjectSchema]] = []
-    terms: Optional[List[MorphKnowledgeMetaObjectGlossaryTerm]] = []
     variables: Optional[Dict[str, Any]] = {}
     data_requirements: Optional[List[str]] = []
     output_paths: Optional[List[str]] = []
@@ -66,28 +60,47 @@ class MorphFunctionMetaObjectCache(BaseModel):
         return None
 
 
-def _cache_path(directory: str) -> str:
-    return f"{directory}/.morph/meta.json"
+class MorphFunctionMetaObjectCacheManager:
+    _instance: Optional["MorphFunctionMetaObjectCacheManager"] = None
+    _cache: Optional["MorphFunctionMetaObjectCache"] = None
 
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(MorphFunctionMetaObjectCacheManager, cls).__new__(cls)
+            cls._instance._cache = None
+        return cls._instance
 
-def load_cache(project_root: str) -> MorphFunctionMetaObjectCache | None:
-    cache_path = _cache_path(project_root)
-    if not Path(cache_path).exists():
-        return None
+    def load_cache(self, project_root: str) -> MorphFunctionMetaObjectCache | None:
+        if self._cache:
+            return self._cache
 
-    with open(cache_path, "r") as f:
-        data = json.load(f)
+        cache_path = self._cache_path(project_root)
+        if not Path(cache_path).exists():
+            return None
 
-    return MorphFunctionMetaObjectCache.model_validate(data)
+        with open(cache_path, "r") as f:
+            data = json.load(f)
 
+        self._cache = MorphFunctionMetaObjectCache.model_validate(data)
+        return self._cache
 
-def dump_cache(cache: MorphFunctionMetaObjectCache) -> None:
-    cache_path = _cache_path(cache.directory)
-    if not Path(cache_path).parent.exists():
-        Path(cache_path).parent.mkdir(parents=True)
+    def dump_cache(self, cache: MorphFunctionMetaObjectCache) -> None:
+        self._cache = cache
 
-    with open(cache_path, "w") as f:
-        json.dump(cache.model_dump(), f, indent=2)
+        cache_path = self._cache_path(self._cache.directory)
+        if os.access(self._cache.directory, os.W_OK):
+            if not Path(cache_path).parent.exists():
+                Path(cache_path).parent.mkdir(parents=True)
+
+            with open(cache_path, "w") as f:
+                json.dump(self._cache.model_dump(), f, indent=2)
+
+    def get_cache(self) -> MorphFunctionMetaObjectCache | None:
+        return self._cache
+
+    @staticmethod
+    def _cache_path(directory: str) -> str:
+        return f"{directory}/.morph/meta.json"
 
 
 class MorphGlobalContext:
@@ -144,29 +157,6 @@ class MorphGlobalContext:
                 function=value["function"] if "function" in value else None,
                 description=value["description"] if "description" in value else None,
                 title=value["title"] if "title" in value else None,
-                schemas=value["schemas"] if "schemas" in value else [],
-                terms=value["terms"] if "terms" in value else [],
-                variables=value["variables"] if "variables" in value else {},
-                data_requirements=(
-                    value["data_requirements"] if "data_requirements" in value else []
-                ),
-                output_paths=value["output_paths"] if "output_paths" in value else [],
-                output_type=value["output_type"] if "output_type" in value else None,
-                connection=value["connection"] if "connection" in value else None,
-                result_cache_ttl=(
-                    value["result_cache_ttl"] if "result_cache_ttl" in value else None
-                ),
-            )
-            self.update_meta_object(key, meta_obj)
-        for key, value in result.vg_json_contexts.items():
-            meta_obj = MorphFunctionMetaObject(
-                id=value["id"] if "id" in value else None,
-                name=value["name"] if "name" in value else None,
-                function=value["function"] if "function" in value else None,
-                description=value["description"] if "description" in value else None,
-                title=value["title"] if "title" in value else None,
-                schemas=value["schemas"] if "schemas" in value else [],
-                terms=value["terms"] if "terms" in value else [],
                 variables=value["variables"] if "variables" in value else {},
                 data_requirements=(
                     value["data_requirements"] if "data_requirements" in value else []
@@ -196,7 +186,7 @@ class MorphGlobalContext:
         if cwd not in sys.path:
             sys.path.append(cwd)
 
-        cache = load_cache(directory)
+        cache = MorphFunctionMetaObjectCacheManager().load_cache(directory)
         if cache is None:
             errors = self.load(directory)
             if len(errors) == 0:
@@ -238,7 +228,7 @@ class MorphGlobalContext:
             self.dump()
             if len(errors) < 1:
                 return errors
-            cache_ = load_cache(directory)
+            cache_ = MorphFunctionMetaObjectCacheManager().load_cache(directory)
             if cache_ is not None:
                 cache = cache_
 
@@ -291,48 +281,6 @@ class MorphGlobalContext:
                         value["description"] if "description" in value else None
                     ),
                     title=value["title"] if "title" in value else None,
-                    schemas=value["schemas"] if "schemas" in value else [],
-                    terms=value["terms"] if "terms" in value else [],
-                    variables=value["variables"] if "variables" in value else {},
-                    data_requirements=(
-                        value["data_requirements"]
-                        if "data_requirements" in value
-                        else []
-                    ),
-                    output_paths=(
-                        value["output_paths"] if "output_paths" in value else []
-                    ),
-                    output_type=(
-                        value["output_type"] if "output_type" in value else None
-                    ),
-                    connection=value["connection"] if "connection" in value else None,
-                    result_cache_ttl=(
-                        value["result_cache_ttl"]
-                        if "result_cache_ttl" in value
-                        else None
-                    ),
-                )
-                self.update_meta_object(key, meta)
-                for data_requirement in target_item.spec.data_requirements or []:
-                    for cache_error in cache.errors:
-                        if cache_error.name == data_requirement:
-                            return [cache_error]
-                    errors = self._partial_load(project, data_requirement, cache)
-                    if len(errors) > 0:
-                        return errors
-        elif target_item.file_path.endswith(".vg.json"):
-            _, context, error = _import_vg_json_file(target_item.file_path)
-            for key, value in context.items():
-                meta = MorphFunctionMetaObject(
-                    id=value["id"] if "id" in value else None,
-                    name=value["name"] if "name" in value else None,
-                    function=value["function"] if "function" in value else None,
-                    description=(
-                        value["description"] if "description" in value else None
-                    ),
-                    title=value["title"] if "title" in value else None,
-                    schemas=value["schemas"] if "schemas" in value else [],
-                    terms=value["terms"] if "terms" in value else [],
                     variables=value["variables"] if "variables" in value else {},
                     data_requirements=(
                         value["data_requirements"]
@@ -407,7 +355,8 @@ class MorphGlobalContext:
             items=cache_items,
             errors=scan.errors,
         )
-        dump_cache(cache)
+        MorphFunctionMetaObjectCacheManager().dump_cache(cache)
+
         return cache
 
     def _add_data(self, key: str, value: pd.DataFrame) -> None:
@@ -445,8 +394,6 @@ class MorphGlobalContext:
             current_obj.output_type = current_obj.output_type or obj.output_type
             current_obj.connection = current_obj.connection or obj.connection
             current_obj.title = current_obj.title or obj.title
-            current_obj.schemas = current_obj.schemas or obj.schemas
-            current_obj.terms = current_obj.terms or obj.terms
             current_obj.result_cache_ttl = (
                 current_obj.result_cache_ttl or obj.result_cache_ttl
             )

@@ -1,4 +1,4 @@
-from typing import Optional, cast
+from typing import Optional
 
 import pandas as pd
 from colorama import Fore
@@ -36,21 +36,18 @@ class Connector:
     Connector class to execute SQL queries on different databases
     @param connection_slug: Connection slug
     @param connection: Connection object (required to set value on cloud)
-    @param is_cloud: Boolean to check if the connection is cloud or not
     """
 
     def __init__(
         self,
         connection_slug: str,
         connection: Optional[Connection] = None,
-        is_cloud: Optional[bool] = False,
     ):
         if connection is None:
             connection = ConnectionYaml.find_connection(None, connection_slug)
         if connection is None:
             raise FileNotFoundError("No connections found")
         self.connection = connection
-        self.is_cloud = is_cloud
 
     def execute_sql(self, sql: str) -> pd.DataFrame:
         if isinstance(self.connection, PostgresqlConnection):
@@ -105,20 +102,9 @@ class Connector:
             )
             return pd.DataFrame(result, columns=columns)
         elif isinstance(self.connection, SnowflakeConnectionOAuth):
-            if self.is_cloud:
-                access_token = self.connection.access_token
-                if access_token is None:
-                    raise ValueError("Access token is required for cloud connection")
-            else:
-                tokens = SnowflakeApi.refresh_access_token(
-                    refresh_token=self.connection.refresh_token,
-                    account=self.connection.account,
-                    client_id=self.connection.client_id,
-                    client_secret=self.connection.client_secret,
-                    redirect_uri=self.connection.redirect_uri,
-                    code_verifier=self.connection.code_verifier,
-                )
-                access_token = cast(str, tokens["access_token"])
+            access_token = self.connection.access_token
+            if access_token is None:
+                raise ValueError("Access token is required for cloud connection")
             result = SnowflakeUsecase(
                 account=self.connection.account,
                 access_token=access_token,
@@ -129,17 +115,9 @@ class Connector:
             ).query(sql)
             return pd.DataFrame(result)
         elif isinstance(self.connection, SnowflakeConnectionKeyPair):
-            if self.is_cloud:
-                access_token = self.connection.access_token
-                if access_token is None:
-                    raise ValueError("Access token is required for cloud connection")
-            else:
-                access_token = SnowflakeApi.get_key_pair_access_token(
-                    account_identifier=self.connection.account,
-                    username=self.connection.username,
-                    private_key_raw=self.connection.key_pair,
-                    passphrase=self.connection.passphrase,
-                )
+            access_token = self.connection.access_token
+            if access_token is None:
+                raise ValueError("Access token is required for cloud connection")
             result = SnowflakeUsecase(
                 account=self.connection.account,
                 access_token=access_token,
@@ -166,17 +144,9 @@ class Connector:
             ).query(sql)
             return pd.DataFrame(result)
         elif isinstance(self.connection, BigqueryConnectionOAuth):
-            if self.is_cloud:
-                access_token = self.connection.access_token
-                if access_token is None:
-                    raise ValueError("Access token is required for cloud connection")
-            else:
-                tokens = BigqueryApi.refresh_access_token(
-                    client_id=self.connection.client_id,
-                    client_secret=self.connection.client_secret,
-                    refresh_token=self.connection.refresh_token,
-                )
-                access_token = cast(str, tokens["access_token"])
+            access_token = self.connection.access_token
+            if access_token is None:
+                raise ValueError("Access token is required for cloud connection")
             result = BigqueryUsecase(
                 project_id=self.connection.project,
                 access_token=access_token,
@@ -194,14 +164,9 @@ class Connector:
             ).query(sql)
             return pd.DataFrame(result)
         elif isinstance(self.connection, BigqueryConnectionServiceAccountJson):
-            if self.is_cloud:
-                access_token = self.connection.access_token
-                if access_token is None:
-                    raise ValueError("Access token is required for cloud connection")
-            else:
-                access_token = BigqueryApi.get_access_token_from_service_account(
-                    service_account_info=self.connection.keyfile_json.model_dump()
-                )
+            access_token = self.connection.access_token
+            if access_token is None:
+                raise ValueError("Access token is required for cloud connection")
             result = BigqueryUsecase(
                 project_id=self.connection.project,
                 access_token=access_token,

@@ -8,33 +8,13 @@ from pydantic import ValidationError
 from morph.api.auth import auth
 from morph.api.error import AuthError, ErrorCode, ErrorMessage, RequestError
 from morph.api.service import (
-    create_file_service,
-    create_scheduled_job_service,
-    delete_scheduled_job_service,
     file_upload_service,
-    find_run_result_detail_service,
-    find_run_result_service,
-    find_scheduled_job_service,
     list_resource_service,
-    list_run_result_service,
-    list_scheduled_jobs_service,
     run_file_service,
     run_file_stream_service,
     run_file_with_type_service,
-    update_scheduled_job_service,
 )
 from morph.api.types import (
-    CreateFileRequestBody,
-    CreateFileService,
-    CreateScheduledJobService,
-    DeleteScheduledJobService,
-    FindRunResultDetailResponse,
-    FindRunResultDetailService,
-    FindRunResultResponse,
-    FindRunResultService,
-    FindScheduledJobService,
-    ListRunResultResponse,
-    ListRunResultService,
     RunFileRequestBody,
     RunFileService,
     RunFileStreamRequestBody,
@@ -43,10 +23,8 @@ from morph.api.types import (
     RunFileWithTypeResponse,
     RunFileWithTypeService,
     SuccessResponse,
-    UpdateScheduledJobService,
     UploadFileService,
 )
-from morph.config.project import Schedule
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -56,10 +34,11 @@ router = APIRouter()
 async def vm_run_file_stream(
     name: str,
     body: RunFileStreamRequestBody,
-    authorization: str = Header(...),
+    authorization: str = Header(None),
+    x_api_key: str = Header(None),
 ) -> StreamingResponse:
     try:
-        await auth(authorization)
+        await auth(authorization, x_api_key)
         input = RunFileStreamService(
             name=name,
             variables=body.variables,
@@ -167,186 +146,6 @@ def list_resource(
     _: str = Security(auth),
 ) -> Any:
     return list_resource_service()
-
-
-@router.post("/cli/file")
-def create_file(
-    body: CreateFileRequestBody,
-    _: str = Security(auth),
-) -> SuccessResponse:
-    try:
-        input = CreateFileService(
-            filename=body.filename,
-            template=body.template,
-            name=body.name,
-            description=body.description,
-            parent_name=body.parentName,
-            connection=body.connection,
-        )
-    except ValidationError as e:
-        error_messages = " ".join([str(err["msg"]) for err in e.errors()])
-        raise RequestError(
-            ErrorCode.RequestError,
-            ErrorMessage.RequestErrorMessage["requestBodyInvalid"],
-            error_messages,
-        )
-    return create_file_service(input)
-
-
-@router.get("/cli/run/{name}")
-def list_run_result(
-    name: str,
-    limit: Optional[int] = None,
-    skip: Optional[int] = None,
-    _: str = Security(auth),
-) -> ListRunResultResponse:
-    try:
-        input = ListRunResultService(name=name, limit=limit, skip=skip)
-    except ValidationError as e:
-        error_messages = " ".join([str(err["msg"]) for err in e.errors()])
-        raise RequestError(
-            ErrorCode.RequestError,
-            ErrorMessage.RequestErrorMessage["requestBodyInvalid"],
-            error_messages,
-        )
-    return list_run_result_service(input)
-
-
-@router.get("/cli/run")
-def find_run_result(
-    runId: str,
-    _: str = Security(auth),
-) -> FindRunResultResponse:
-    try:
-        input = FindRunResultService(run_id=runId)
-    except ValidationError as e:
-        error_messages = " ".join([str(err["msg"]) for err in e.errors()])
-        raise RequestError(
-            ErrorCode.RequestError,
-            ErrorMessage.RequestErrorMessage["requestBodyInvalid"],
-            error_messages,
-        )
-    return find_run_result_service(input)
-
-
-@router.get("/cli/run/{name}/{runId}/{type}")
-def find_run_result_detail(
-    name: str,
-    runId: str,
-    type: Literal["json", "html", "image", "markdown"],
-    limit: Optional[int] = None,
-    skip: Optional[int] = None,
-    _: str = Security(auth),
-) -> FindRunResultDetailResponse:
-    try:
-        input = FindRunResultDetailService(
-            name=name,
-            run_id=runId,
-            type=type,
-            limit=limit,
-            skip=skip,
-        )
-    except ValidationError as e:
-        error_messages = " ".join([str(err["msg"]) for err in e.errors()])
-        raise RequestError(
-            ErrorCode.RequestError,
-            ErrorMessage.RequestErrorMessage["requestBodyInvalid"],
-            error_messages,
-        )
-    return find_run_result_detail_service(input)
-
-
-@router.get("/cli/morph-project/scheduled-jobs")
-def list_scheduled_jobs(
-    _: str = Security(auth),
-) -> Any:
-    return list_scheduled_jobs_service()
-
-
-@router.get("/cli/morph-project/scheduled-jobs/{name}/schedules/{index}")
-def find_scheduled_jobs(
-    name: str,
-    index: int,
-    _: str = Security(auth),
-) -> Any:
-    try:
-        input = FindScheduledJobService(
-            name=name,
-            index=index,
-        )
-    except ValidationError as e:
-        error_messages = " ".join([str(err["msg"]) for err in e.errors()])
-        raise RequestError(
-            ErrorCode.RequestError,
-            ErrorMessage.RequestErrorMessage["requestBodyInvalid"],
-            error_messages,
-        )
-    return find_scheduled_job_service(input)
-
-
-@router.post("/cli/morph-project/scheduled-jobs/{name}/schedules")
-def create_scheduled_jobs(
-    name: str,
-    body: Schedule,
-    _: str = Security(auth),
-) -> Any:
-    try:
-        input = CreateScheduledJobService(
-            name=name,
-            schedule=body,
-        )
-    except ValidationError as e:
-        error_messages = " ".join([str(err["msg"]) for err in e.errors()])
-        raise RequestError(
-            ErrorCode.RequestError,
-            ErrorMessage.RequestErrorMessage["requestBodyInvalid"],
-            error_messages,
-        )
-    return create_scheduled_job_service(input)
-
-
-@router.put("/cli/morph-project/scheduled-jobs/{name}/schedules/{index}")
-def update_scheduled_jobs(
-    name: str,
-    index: int,
-    body: Schedule,
-    _: str = Security(auth),
-) -> Any:
-    try:
-        input = UpdateScheduledJobService(
-            name=name,
-            index=index,
-            schedule=body,
-        )
-    except ValidationError as e:
-        error_messages = " ".join([str(err["msg"]) for err in e.errors()])
-        raise RequestError(
-            ErrorCode.RequestError,
-            ErrorMessage.RequestErrorMessage["requestBodyInvalid"],
-            error_messages,
-        )
-    return update_scheduled_job_service(input)
-
-
-@router.delete("/cli/morph-project/scheduled-jobs/{name}/schedules/{index}")
-def delete_scheduled_jobs(
-    name: str,
-    index: int,
-    _: str = Security(auth),
-) -> Any:
-    try:
-        input = DeleteScheduledJobService(
-            name=name,
-            index=index,
-        )
-    except ValidationError as e:
-        error_messages = " ".join([str(err["msg"]) for err in e.errors()])
-        raise RequestError(
-            ErrorCode.RequestError,
-            ErrorMessage.RequestErrorMessage["requestBodyInvalid"],
-            error_messages,
-        )
-    return delete_scheduled_job_service(input)
 
 
 @router.post("/cli/file-upload")

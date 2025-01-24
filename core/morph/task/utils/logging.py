@@ -40,18 +40,13 @@ async def redirect_stdout_to_logger_async(logger, level=logging.INFO):
         yield
 
 
-def get_morph_logger(log_file: str) -> logging.Logger:
-    logger = logging.getLogger(log_file)
+def get_morph_logger() -> logging.Logger:
+    logger = logging.getLogger("morph_logger")
 
     if not logger.hasHandlers():
         logger.setLevel(logging.DEBUG)
 
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-        )
-        logger.addHandler(file_handler)
-
+        # Console handler with color formatting
         console_handler = colorlog.StreamHandler()
         console_handler.setLevel(logging.DEBUG)
         console_formatter = colorlog.ColoredFormatter(

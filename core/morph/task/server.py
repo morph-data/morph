@@ -1,5 +1,5 @@
 import logging
-import os
+import sys
 
 import click
 import uvicorn
@@ -19,17 +19,40 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-def start_server(host: str = "0.0.0.0", port: int = 9002) -> None:
-    os.environ["MORPH_UVICORN_HOST"] = host
-    os.environ["MORPH_UVICORN_PORT"] = str(port)
+def parse_sys_argv():
+    port = 8080
 
+    filtered_args = []
+    skip_next = False
+    for i, arg in enumerate(sys.argv[1:]):
+        if skip_next:
+            skip_next = False
+            continue
+
+        if arg == "--port" and i + 1 < len(sys.argv):
+            try:
+                port = int(sys.argv[i + 2])
+                skip_next = True
+            except ValueError:
+                port = 8080
+            continue
+
+        filtered_args.append(arg)
+
+    sys.argv = [sys.argv[0]] + filtered_args
+
+    return port
+
+
+def start_server(port: int) -> None:
     uvicorn.run(
         "morph.api.app:app",
-        host=host,
+        host="0.0.0.0",
         port=port,
         reload=True,
     )
 
 
 if __name__ == "__main__":
-    start_server()
+    port = parse_sys_argv()
+    start_server(port)

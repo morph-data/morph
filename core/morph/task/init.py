@@ -272,7 +272,7 @@ class InitTask(BaseTask):
         )
         click.echo(
             click.style(
-                f"You can edit your connection details in `{MorphConstant.INIT_DIR}/connections.yaml`",
+                f"You can edit your connection details in `{MorphConstant.INIT_DIR}/connections.yml`",
                 fg="green",
             )
         )

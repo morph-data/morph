@@ -72,23 +72,7 @@ def config(
 
 @cli.command("new")
 @click.argument("directory_name", required=False)
-@click.option(
-    "--github-url",
-    type=str,
-    help="Specify the github URL to clone the workspace template.",
-)
-@click.option(
-    "--directory",
-    type=str,
-    help="Specify the directory to clone the workspace template.",
-)
-@click.option(
-    "--branch",
-    type=str,
-    default="main",
-    show_default=True,
-    help="Specify the branch to clone. Defaults to 'main'.",
-)
+@params.project_id
 @click.pass_context
 @global_flags
 @requires.preflight
@@ -145,50 +129,6 @@ def run(
     return results, True
 
 
-@cli.command("print")
-@click.pass_context
-@global_flags
-@params.file
-@params.alias
-@params.all
-@params.verbose
-@requires.preflight
-@requires.postflight
-def print_resource(
-    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
-) -> Tuple[Union[Dict[str, Union[str, int, bool]], None], bool]:
-    """Print details for the specified resource by path or alias."""
-    from morph.task.resource import PrintResourceTask
-
-    task = PrintResourceTask(ctx.obj["flags"])
-    results = task.run()
-    return results, True
-
-
-@cli.command("create")
-@click.argument("filename", required=True)
-@click.option("--template", type=str, help="Specify the template name.")
-@click.option("--name", type=str, help="Specify the function name.")
-@click.option("--description", type=str, help="Specify the function description.")
-@click.option("--parent-name", type=str, help="Specify the parent function name.")
-@click.option("--connection", type=str, help="Specify the connection name.")
-@params.verbose
-@click.pass_context
-@global_flags
-@requires.preflight
-@requires.postflight
-def create(
-    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
-) -> Tuple[None, bool]:
-    """Create files, using global or user defined templates."""
-    from morph.task.create import CreateTask
-
-    task = CreateTask(ctx.obj["flags"])
-    task.run()
-
-    return None, True
-
-
 @cli.command("clean")
 @params.verbose
 @click.pass_context
@@ -207,31 +147,26 @@ def clean(
     return None, True
 
 
-@cli.command("sync")
+@cli.command("deploy")
+@params.no_cache
 @params.verbose
 @click.pass_context
 @global_flags
 @requires.preflight
 @requires.postflight
-def sync(
-    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
+def deploy(
+    ctx: click.Context, no_cache: bool, **kwargs: Dict[str, Union[str, int, bool]]
 ) -> Tuple[Union[Dict[str, Union[str, int, bool]], None], bool]:
-    """Synchronize local morph project with the cloud."""
-    from morph.task.sync import SyncTask
+    """Deploy morph project to the cloud."""
+    from morph.task.deploy import DeployTask
 
-    task = SyncTask(ctx.obj["flags"])
+    task = DeployTask(ctx.obj["flags"])
     results = task.run()
     return results, True
 
 
 @cli.command("serve")
-@params.port
-@params.host
-@params.restart
 @params.workdir
-@params.stop
-@params.build
-@params.no_log
 @click.pass_context
 @global_flags
 @requires.preflight
@@ -262,24 +197,3 @@ def init(
     task = InitTask(ctx.obj["flags"])
     results = task.run()
     return results, True
-
-
-@cli.command("build-frontend")
-@params.port
-@params.host
-@params.workdir
-@params.no_log
-@click.pass_context
-@global_flags
-@requires.preflight
-@requires.postflight
-def build_frontend(
-    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
-) -> Tuple[None, bool]:
-    """Build frontend with server."""
-    from morph.task.build import BuildTask
-
-    task = BuildTask(ctx.obj["flags"])
-    task.run()
-
-    return None, True

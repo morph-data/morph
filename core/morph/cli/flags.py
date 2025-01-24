@@ -13,7 +13,6 @@ from click.core import Command as ClickCommand
 from click.core import Group, ParameterSource
 from packaging.version import InvalidVersion, Version
 
-from morph.api.cloud.utils import is_cloud
 from morph.cli.types import Command as CliCommand
 
 if os.name != "nt":
@@ -388,9 +387,6 @@ def format_params(params: List[Parameter]) -> ArgsList:
 
 def get_latest_version() -> Optional[str]:
     """Retrieve the latest morph-data version from PyPI."""
-    if is_cloud():
-        return None
-
     try:
         response = requests.get("https://pypi.org/pypi/morph-data/json", timeout=5)
         if response.status_code == 200:

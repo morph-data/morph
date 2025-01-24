@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 from typing import Annotated
@@ -17,51 +16,17 @@ from inertia import (
     inertia_request_validation_exception_handler,
     inertia_version_conflict_exception_handler,
 )
+from mangum import Mangum
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from morph.api.cloud.utils import is_cloud
 from morph.api.error import ApiBaseError, InternalError
 from morph.api.handler import router
-from morph.constants import MorphConstant
 
 # configuration values
-build_required = os.getenv("MORPH_FRONT_BUILD", "false")
-host = os.getenv("MORPH_UVICORN_HOST", "0.0.0.0")
-port = os.getenv("MORPH_UVICORN_PORT", "9002")
-server_url = f"http://{host}:{port}"
-front_url = "http://localhost:3000"
-token = "dummy"
-environment = "development"
-entrypoint_filename = "main.tsx"
-template_dir = os.path.join(Path(__file__).resolve().parent, "templates", "development")
 
-if is_cloud():
-    with open(MorphConstant.MORPH_CLOUD_CONFIG_PATH, "r") as f:
-        domain = json.loads(f.read())["domain"]
-        front_url = f"https://live2-{domain}"
-        server_url = f"https://live-{domain}"
-    with open(MorphConstant.MORPH_CLOUD_CONFIG_PATH, "r") as f:
-        token = json.loads(f.read())["token"]
-
-if build_required == "true":
-    environment = "production"
-    entrypoint_filename = "main-prod.tsx"
-    template_dir = os.path.join(
-        Path(__file__).resolve().parent, "templates", "production"
-    )
-else:
-    init_index_template_path = os.path.join(
-        Path(__file__).resolve().parent, "templates", "index.html"
-    )
-    with open(init_index_template_path, "r") as f:
-        content = f.read()
-        content = content.replace("FRONT_URL", front_url)
-    index_template = os.path.join(template_dir, "index.html")
-    with open(index_template, "w") as f:
-        f.write(content)
-
-templates = Jinja2Templates(directory=template_dir)
+# set true to MORPH_LOCAL_DEV_MODE to use local frontend server
+is_local_dev_mode = True if os.getenv("MORPH_LOCAL_DEV_MODE") == "true" else False
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="secret_key")
@@ -74,34 +39,53 @@ app.add_exception_handler(
     inertia_request_validation_exception_handler,
 )
 
-frontend_dir = os.path.join(Path(__file__).resolve().parents[1], "frontend")
+frontend_dir = os.path.join(os.getcwd(), ".morph", "frontend")
 
-manifest_json = os.path.join(frontend_dir, "dist", "manifest.json")
-inertia_config = InertiaConfig(
-    templates=templates,
-    manifest_json_path=manifest_json,
-    environment=environment,
-    use_flash_messages=True,
-    use_flash_errors=True,
-    entrypoint_filename=entrypoint_filename,
-    assets_prefix="/src",
-    dev_url=front_url,
-)
+
+def get_inertia_config():
+    templates_dir = os.path.join(Path(__file__).resolve().parent, "templates")
+
+    if is_local_dev_mode:
+        front_port = os.getenv("MORPH_FRONT_PORT", "3000")
+        frontend_url = f"http://localhost:{front_port}"
+        templates = Jinja2Templates(directory=templates_dir)
+        templates.env.globals["local_dev_mode"] = True
+        templates.env.globals["frontend_url"] = frontend_url
+
+        return InertiaConfig(
+            templates=templates,
+            environment="development",
+            use_flash_messages=True,
+            use_flash_errors=True,
+            entrypoint_filename="main.tsx",
+            assets_prefix="/src",
+            dev_url=frontend_url,
+        )
+
+    return InertiaConfig(
+        templates=Jinja2Templates(directory=templates_dir),
+        manifest_json_path=os.path.join(frontend_dir, "dist", "manifest.json"),
+        environment="production",
+        entrypoint_filename="main.tsx",
+    )
+
+
+inertia_config = get_inertia_config()
+
 InertiaDep = Annotated[Inertia, Depends(inertia_dependency_factory(inertia_config))]
 
-frontend_dir = (
-    os.path.join(frontend_dir, "dist")
-    if inertia_config.environment != "development"
-    else os.path.join(frontend_dir, "src")
-)
-
-app.mount("/src", StaticFiles(directory=frontend_dir), name="src")
-app.mount(
-    "/assets",
-    StaticFiles(directory=os.path.join(frontend_dir, "assets")),
-    name="assets",
-)
-
+if is_local_dev_mode:
+    app.mount(
+        "/src",
+        StaticFiles(directory=os.path.join(frontend_dir, "src")),
+        name="src",
+    )
+else:
+    app.mount(
+        "/assets",
+        StaticFiles(directory=os.path.join(frontend_dir, "dist", "assets")),
+        name="assets",
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -143,13 +127,7 @@ async def handle_other_error(_, exc):
 
 @app.get("/", response_model=None)
 async def index(inertia: InertiaDep) -> InertiaResponse:
-    return await inertia.render(
-        "index",
-        {
-            "baseUrl": server_url,
-            "token": token,
-        },
-    )
+    return await inertia.render("index", {"showAdminPage": is_local_dev_mode})
 
 
 @app.get(
@@ -162,17 +140,18 @@ async def health_check():
 app.include_router(router)
 
 
+@app.get("/morph", response_model=None)
+async def morph(inertia: InertiaDep) -> InertiaResponse:
+
+    if is_local_dev_mode:
+        return await inertia.render("morph", {"showAdminPage": True})
+
+    return await inertia.render("404", {"showAdminPage": False})
+
+
 @app.get("/{full_path:path}", response_model=None)
 async def subpages(full_path: str, inertia: InertiaDep) -> InertiaResponse:
-    cwd = os.getcwd()
-    pages_dir = os.path.join(cwd, "src", "pages")
-    if not os.path.exists(os.path.join(pages_dir, f"{full_path}.mdx")):
-        return await inertia.render("404")
+    return await inertia.render(full_path, {"showAdminPage": is_local_dev_mode})
 
-    return await inertia.render(
-        full_path,
-        {
-            "baseUrl": server_url,
-            "token": token,
-        },
-    )
+
+handler = Mangum(app)

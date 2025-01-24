@@ -1,3 +1,4 @@
+import importlib.metadata
 import os
 import shutil
 import subprocess
@@ -6,21 +7,19 @@ from pathlib import Path
 from typing import Optional
 
 import click
-import git
 
-from morph import MorphGlobalContext
-from morph.api.cloud.utils import is_cloud
 from morph.cli.flags import Flags
 from morph.config.project import default_initial_project, load_project, save_project
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
-from morph.task.utils.connection import ConnectionYaml
-from morph.task.utils.sqlite import SqliteDBManager
+from morph.task.utils.morph import initialize_frontend_dir
+from morph.task.utils.run_backend.state import MorphGlobalContext
 
 
 class NewTask(BaseTask):
     def __init__(self, args: Flags, project_directory: Optional[str]):
         super().__init__(args)
+        self.is_development = os.environ.get("MORPH_DEVELOPMENT", False)
         self.args = args
 
         if not project_directory:
@@ -33,214 +32,189 @@ class NewTask(BaseTask):
             os.makedirs(morph_dir)
             click.echo(f"Created directory at {morph_dir}")
 
+        # Initialize the frontend directory
+        # Copy the frontend template to ~/.morph/frontend if it doesn't exist
+        initialize_frontend_dir(self.project_root)
+
     def run(self):
-        # Validate workspace template options
-        github_url = self.args.GITHUB_URL
-        directory = self.args.DIRECTORY
-        branch = self.args.BRANCH
-        if (github_url and not directory) or (not github_url and directory):
+        click.echo("Creating new Morph project...")
+
+        if not os.path.exists(self.project_root):
+            os.makedirs(self.project_root, exist_ok=True)
+
+        click.echo(f"Applying template to {self.project_root}...")
+
+        templates_dir = (
+            Path(__file__).parents[1].joinpath("include", "starter_template")
+        )
+        for root, _, template_files in os.walk(templates_dir):
+            rel_path = os.path.relpath(root, templates_dir)
+            target_path = os.path.join(self.project_root, rel_path)
+
+            os.makedirs(target_path, exist_ok=True)
+
+            for template_file in template_files:
+                src_file = os.path.join(root, template_file)
+                dest_file = os.path.join(target_path, template_file)
+                shutil.copy2(src_file, dest_file)
+
+        # Execute the post-setup tasks
+        self.original_dir = os.getcwd()
+        os.chdir(self.project_root)
+        self.project_root = (
+            os.getcwd()
+        )  # This avoids compile errors in case the project root is symlinked
+
+        # Compile the project
+        context = MorphGlobalContext.get_instance()
+        context.load(self.project_root)
+        context.dump()
+
+        project = load_project(self.project_root)
+        if project is None:
+            project = default_initial_project()
+        if self.args.PROJECT_ID:
+            project.project_id = self.args.PROJECT_ID
+
+        # Ask the user to select a package manager
+        package_manager_options = {
+            "1": "pip",
+            "2": "poetry",
+        }
+        click.echo()
+        click.echo("Select a package manager for your project:")
+        for key, value in package_manager_options.items():
+            click.echo(click.style(f"{key}: {value}", fg="blue"))
+
+        click.echo(
+            click.style("Enter the number of your choice. (default is ["), nl=False
+        )
+        click.echo(click.style("1: pip", fg="blue"), nl=False)
+        click.echo(click.style("]): "), nl=False)
+        package_manager_choice = input().strip()
+
+        # Validate user input and set the package manager
+        project.package_manager = package_manager_options.get(
+            package_manager_choice, "pip"
+        )
+        if project.package_manager not in package_manager_options.values():
             click.echo(
                 click.style(
-                    "Both --github-url and --directory must be specified together.",
-                    fg="red",
-                    bg="yellow",
+                    "Warning: Invalid package manager. Defaulting to 'pip'.",
+                    fg="yellow",
                 )
             )
-            sys.exit(2)  # 2: Misuse of shell builtins
+            project.package_manager = "pip"
 
-        if not is_cloud() and not github_url and not directory:
-            click.echo("Creating new Morph project...")
+        save_project(self.project_root, project)
 
-            if not os.path.exists(self.project_root):
-                os.makedirs(self.project_root, exist_ok=True)
-
-            click.echo(f"Applying template to {self.project_root}...")
-
-            templates_dir = (
-                Path(__file__).parents[1].joinpath("include", "starter_template")
-            )
-            for root, _, template_files in os.walk(templates_dir):
-                rel_path = os.path.relpath(root, templates_dir)
-                target_path = os.path.join(self.project_root, rel_path)
-
-                os.makedirs(target_path, exist_ok=True)
-
-                for template_file in template_files:
-                    src_file = os.path.join(root, template_file)
-                    dest_file = os.path.join(target_path, template_file)
-                    shutil.copy2(src_file, dest_file)
-
-            db_path = f"{self.project_root}/morph_project.sqlite3"
-            if not os.path.exists(db_path):
-                with open(db_path, "w") as f:
-                    f.write("")
-
-            # Initialize the project database
-            db_manager = SqliteDBManager(self.project_root)
-            db_manager.initialize_database()
-
-            # Execute the post-setup tasks
-            original_working_dir = os.getcwd()
-            os.chdir(self.project_root)
-            self.project_root = (
-                os.getcwd()
-            )  # This avoids compile errors in case the project root is symlinked
-
-            # Compile the project
-            context = MorphGlobalContext.get_instance()
-            context.load(self.project_root)
-            context.dump()
-
-            connection_yaml = ConnectionYaml.load_yaml()
-            if len(list(connection_yaml.connections.keys())) > 0:
-                default_connection = list(connection_yaml.connections.keys())[0]
-                project = load_project(self.project_root)
-                if project is None:
-                    project = default_initial_project()
-                project.default_connection = default_connection
-                save_project(self.project_root, project)
-
-            os.chdir(original_working_dir)
-        else:
-            # Apply default template if no options are specified
-            github_url = (
-                github_url or "https://github.com/useMorph/workspace-template.git"
-            )
-            directory = directory or "template/morph-starter"
-
-            if not github_url.startswith("http"):
-                click.echo(
-                    click.style(
-                        "--github-url must be a valid URL starting with 'http' or 'https'. Other protocols are not supported.",
-                        fg="red",
-                        bg="yellow",
-                    )
+        # Generate the Dockerfile template
+        template_dir = Path(__file__).parents[1].joinpath("include")
+        docker_template_file = template_dir.joinpath("Dockerfile")
+        if not docker_template_file.exists():
+            click.echo(
+                click.style(
+                    f"Template file not found: {docker_template_file}", fg="red"
                 )
-                sys.exit(2)  # 2: Misuse of shell builtins
+            )
+            click.echo()
+            sys.exit(1)
 
-            click.echo("Creating new Morph project...")
+        # Copy the selected Dockerfile to the project directory
+        dockerfile_path = os.path.join(self.project_root, "Dockerfile")
+        shutil.copy2(docker_template_file, dockerfile_path)
 
-            # Create the project structure
-            if not os.path.exists(self.project_root):
-                os.makedirs(self.project_root, exist_ok=True)
+        try:
+            morph_data_version = importlib.metadata.version("morph-data")
+        except importlib.metadata.PackageNotFoundError:
+            morph_data_version = None
+            click.echo(
+                click.style(
+                    "No local 'morph-data' found. Using unpinned (no version).",
+                    fg="yellow",
+                )
+            )
 
-            # Clone the workspace template
-            click.echo(f"Cloning workspace template from {github_url}...")
-            clone_dir = Path(f"/tmp/{os.path.split(github_url)[-1]}")
-            if os.path.exists(clone_dir.as_posix()):
-                shutil.rmtree(clone_dir.as_posix())
+        # Handle dependencies based on package manager
+        if project.package_manager == "poetry":
+            click.echo(click.style("Initializing Poetry...", fg="blue"))
             try:
-                git.Repo.clone_from(
-                    github_url,
-                    clone_dir.as_posix(),
-                    branch=branch,
-                    depth=1,
-                    single_branch=True,
-                )
-            except git.exc.GitCommandError as e:
-                click.echo(
-                    click.style(
-                        f"Failed to clone the workspace template from {github_url}",
-                        fg="red",
-                        bg="yellow",
+                # Prepare the dependency argument
+                if self.is_development:
+                    branch = self._get_current_git_branch() or "develop"
+                    dependency = f"git+https://github.com/morph-data/morph.git@{branch}"
+                else:
+                    dependency = (
+                        f"morph-data=={morph_data_version}"
+                        if morph_data_version
+                        else "morph-data"
                     )
-                )
 
-                if e.stderr:
-                    git_err_msg = e.stderr.strip().strip("'")
-                    if git_err_msg.startswith("stderr: "):
-                        git_err_msg = git_err_msg[len("stderr: ") :]
-                    click.echo(click.style(git_err_msg, fg="red"))
-                sys.exit(1)  # 1: General errors
-
-            # Apply the template to the project directory
-            click.echo(f"Applying {directory} template to {self.project_root}...")
-            try:
+                # Use poetry init with the --dependency option
                 subprocess.run(
-                    f"cp -r {clone_dir.joinpath(directory).as_posix()}/. {self.project_root}",
-                    shell=True,
+                    ["poetry", "init", "--no-interaction", "--dependency", dependency],
                     check=True,
                 )
-            except subprocess.CalledProcessError:
+
                 click.echo(
                     click.style(
-                        f"Failed to apply {directory} template. Please check your directory structure of workspace template.",
-                        fg="red",
-                        bg="yellow",
+                        f"Added 'morph-data' to pyproject.toml with {dependency}.",
+                        fg="green",
                     )
                 )
-                sys.exit(1)  # 1: General errors
+            except subprocess.CalledProcessError as e:
+                click.echo(click.style(f"Poetry initialization failed: {e}", fg="red"))
+                click.echo()
+                sys.exit(1)
+        elif project.package_manager == "pip":
+            click.echo(click.style("Generating requirements.txt...", fg="blue"))
+            requirements_path = os.path.join(self.project_root, "requirements.txt")
+            try:
+                with open(requirements_path, "w") as f:
+                    if self.is_development:
+                        branch = self._get_current_git_branch() or "develop"
+                        f.write(
+                            f"git+https://github.com/morph-data/morph.git@{branch}#egg=morph-data\n"
+                        )
+                    else:
+                        if morph_data_version:
+                            f.write(f"morph-data=={morph_data_version}\n")
+                        else:
+                            f.write("morph-data\n")
+                click.echo(
+                    click.style(
+                        "Created requirements.txt with 'morph-data'.",
+                        fg="green",
+                    )
+                )
+            except IOError as e:
+                click.echo(
+                    click.style(f"Failed to create requirements.txt: {e}", fg="red")
+                )
+                sys.exit(1)
 
-            # Add 'file_upload' python file
-            file_upload_python_path = f"{self.project_root}/src/utils/file_upload.py"
-            file_upload_python_content = """\
-import os
-import morph
-from morph import MorphGlobalContext
-
-# Morph decorators
-# The `@morph.func` decorator required to be recognized as a function in morph.
-# For more information: https://docs.morph-data.io
-@morph.func(
-    name="file_upload",
-)
-@morph.variables("file")
-def file_upload(context: MorphGlobalContext) -> str:
-    # Retrieve the `file` variable from the context (Expand `~` to the full path)
-    filepath = os.path.expanduser(context.vars["file"])
-    filename = os.path.basename(filepath)
-
-    # Check if the file exists
-    if not os.path.isfile(filepath):
-        raise FileNotFoundError(f"File not found: {filepath}")
-
-    # Create the uploaded-files directory if it doesn't exist
-    # NOTE: Make sure to use an absolute path for the directory
-    upload_dir = os.path.abspath("uploaded-files/")
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
-
-    # Read the content of the file in binary mode
-    with open(filepath, "rb") as f:
-        file_content = f.read()
-
-    # Save the content to the uploaded-files directory in binary mode
-    saved_filepath = os.path.join(upload_dir, filename)
-    with open(saved_filepath, "wb") as f:
-        f.write(file_content)
-
-    return saved_filepath
-    """
-            if not os.path.exists(file_upload_python_path):
-                file_upload_python_dir = os.path.dirname(file_upload_python_path)
-                if not os.path.exists(file_upload_python_dir):
-                    os.makedirs(file_upload_python_dir)
-                with open(file_upload_python_path, "w") as f:
-                    f.write(file_upload_python_content)
-
-            db_path = f"{self.project_root}/morph_project.sqlite3"
-            if not os.path.exists(db_path):
-                with open(db_path, "w") as f:
-                    f.write("")
-
-            # Initialize the project database
-            db_manager = SqliteDBManager(self.project_root)
-            db_manager.initialize_database()
-
-            # Execute the post-setup tasks
-            original_working_dir = os.getcwd()
-            os.chdir(self.project_root)
-            self.project_root = (
-                os.getcwd()
-            )  # This avoids compile errors in case the project root is symlinked
-
-            # Compile the project
-            context = MorphGlobalContext.get_instance()
-            context.load(self.project_root)
-            context.dump()
-
-            os.chdir(original_working_dir)
-
+        click.echo()
         click.echo(click.style("Project setup completed successfully! 🎉", fg="green"))
-
         return True
+
+    def _get_current_git_branch(self) -> Optional[str]:
+        """
+        Safely get the current Git branch name.
+
+        Returns:
+            Optional[str]: The current branch name, or None if it cannot be determined.
+        """
+        try:
+            # Run the git command to get the current branch name
+            branch = subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=self.original_dir,
+                text=True,
+            ).strip()
+            return branch or None
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Return None if Git command fails or Git is not installed
+            click.echo(
+                click.style("Warning: Git not found or command failed.", fg="yellow")
+            )
+            return None

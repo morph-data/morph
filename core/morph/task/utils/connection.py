@@ -106,6 +106,7 @@ class PostgresqlConnection(BaseModel):
     ssh_user: Optional[str] = None
     ssh_password: Optional[str] = None
     ssh_private_key: Optional[str] = None
+    timezone: Optional[str] = None
 
     model_config = ConfigDict(use_enum_values=True, populate_by_name=True)
 
@@ -577,8 +578,7 @@ class ConnectionYaml(BaseModel):
     @staticmethod
     def load_yaml() -> "ConnectionYaml":
         if not ConnectionYaml.is_file_exits():
-            with open(MorphConstant.MORPH_CONNECTION_PATH, "w") as file:
-                yaml.dump({"connections": []}, file)
+            return ConnectionYaml(connections={})
 
         with open(MorphConstant.MORPH_CONNECTION_PATH, "r") as file:
             data = yaml.safe_load(file)
@@ -706,6 +706,7 @@ class ConnectionYaml(BaseModel):
 
                 connection_string = response_json["maskedUrl"]
                 password = response_json["password"]
+                timezone = response_json["timezone"]
 
                 pattern = re.compile(
                     r"postgresql://(?P<username>[^:]+):(?P<password>[^@]+)@(?P<host>[^/]+)/(?P<database>[^?]+)\?sslmode=require"
@@ -719,7 +720,7 @@ class ConnectionYaml(BaseModel):
                 host = match.group("host")
                 database = match.group("database")
 
-                return client.req.workspace_id, PostgresqlConnection(
+                return client.req.project_id, PostgresqlConnection(
                     type=CONNECTION_TYPE.postgres,
                     host=host,
                     user=username,
@@ -727,6 +728,7 @@ class ConnectionYaml(BaseModel):
                     port=5432,
                     dbname=database,
                     schema="public",
+                    timezone=timezone,
                 )
 
     @staticmethod
@@ -735,6 +737,9 @@ class ConnectionYaml(BaseModel):
     ) -> Connection:
         if connection_slug == MORPH_DUCKDB_CONNECTION_SLUG:
             return DuckDBConnection(type=CONNECTION_TYPE.duckdb)
+        elif connection_slug == MORPH_BUILTIN_DB_CONNECTION_SLUG:
+            _, builtin_connection = ConnectionYaml.find_builtin_db_connection()
+            return builtin_connection
         try:
             try:
                 client = MorphApiClient(MorphApiKeyClientImpl)

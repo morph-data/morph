@@ -95,32 +95,10 @@ run_id = click.option(
     help="Specify the run id.",
 )
 
-canvas = click.option("--canvas", "-c", help="Specify the canvas name.")
-
 dag = click.option(
     "--dag",
     is_flag=True,
     help="Run as a Directed Acyclic Graph (DAG).",
-)
-
-no_cache = click.option(
-    "--no-cache",
-    is_flag=True,
-    help="Do not use the cache.",
-)
-
-
-is_debug = click.option(
-    "--debug",
-    is_flag=True,
-    help="Enable debug mode.",
-)
-
-dry_run = click.option(
-    "--dry-run",
-    "-n",
-    is_flag=True,
-    help="Perform a dry run without executing the tasks.",
 )
 
 verbose = click.option(
@@ -130,108 +108,10 @@ verbose = click.option(
     help="Enable verbose mode.",
 )
 
-file = click.option(
-    "--file",
-    "-f",
-    type=click.Path(exists=True),
-    help="Specify the path to the resource.",
-)
-
-alias = click.option(
-    "--alias",
-    "-a",
-    type=str,
-    help="Specify the alias of the resource.",
-)
-
-all = click.option(
-    "--all",
-    is_flag=True,
-    help="Select all resources.",
-)
-
-connection = click.option(
-    "--connection",
-    "-c",
-    type=str,
-    help="Specify the connection slug.",
-)
-
-
-output_paths = click.option(
-    "--output-paths",
-    "-o",
-    type=click.Path(exists=False),
-    multiple=True,
-    help="Specify the output paths.",
-)
-
-parent_output_path = click.option(
-    "--parent-output-path",
-    "-po",
-    multiple=True,
-    callback=parse_key_value,
-    help="Key-value pairs in the form key=value",
-)
-
-tmp = click.option(
-    "--tmp",
-    is_flag=True,
-    help="Whether to save output to a temporary file.",
-)
-
-template = click.option(
-    "--template",
-    "-t",
-    type=str,
-    required=True,
-    help="Specify the path or alias to the template.",
-)
-
-stream = click.option(
-    "--stream",
-    is_flag=True,
-    help="Whether to echo streaming output.",
-)
-
-port = click.option(
-    "--port",
-    "-p",
-    type=int,
-    help="API Server port.",
-    default=9002,
-)
-
-host = click.option(
-    "--host",
-    "-h",
-    type=str,
-    help="API Server Host.",
-    default="0.0.0.0",
-)
-
-restart = click.option(
-    "--restart",
-    is_flag=True,
-    help="Whether to restart API server.",
-)
-
 workdir = click.option(
     "--workdir",
     type=str,
     help="Specify the project workdir.",
-)
-
-stop = click.option(
-    "--stop",
-    is_flag=True,
-    help="Whether to stop API server.",
-)
-
-build = click.option(
-    "--build",
-    is_flag=True,
-    help="Whether to build front code.",
 )
 
 profile = click.option(
@@ -240,8 +120,14 @@ profile = click.option(
     help="Specify the profile name.",
 )
 
-no_log = click.option(
-    "--no-log",
+project_id = click.option(
+    "--project-id",
+    type=str,
+    help="Specify the project id.",
+)
+
+no_cache = click.option(
+    "--no-cache",
     is_flag=True,
-    help="Whether to disable logging.",
+    help="Disable cache.",
 )

@@ -29,7 +29,7 @@ morph new
 morph serve
 ```
 
-4. Visit `http://localhsot:9002` on browser.
+4. Visit `http://localhsot:8080` on browser.
 
 ## How it works
 
@@ -55,7 +55,6 @@ Understanding the concept of developing a data app in Morph will let you do a fl
 
 1. Create each files in `sql`, `python` and `pages` directories.
 
-
 SQL: Using DuckDB to read CSV file.
 
 ```sql
@@ -71,7 +70,6 @@ select
 from
     read_csv("example.csv")
 ```
-
 
 Python: Using Plotly to create a chart.
 

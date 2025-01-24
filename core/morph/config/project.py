@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -7,36 +7,31 @@ from pydantic import BaseModel, Field
 from morph.constants import MorphConstant
 from morph.task.utils.connection import (
     CONNECTION_TYPE,
-    MORPH_BUILTIN_DB_CONNECTION_SLUG,
+    MORPH_DUCKDB_CONNECTION_SLUG,
     MorphConnection,
 )
-
-
-class Schedule(BaseModel):
-    cron: str
-    is_enabled: bool = True
-    timezone: str = "UTC"
-    variables: Optional[Dict[str, Any]] = None
-
-
-class ScheduledJob(BaseModel):
-    schedules: List[Schedule]
+from morph.task.utils.morph import find_project_root_dir
 
 
 class MorphProject(BaseModel):
     profile: Optional[str] = "default"
     source_paths: List[str] = Field(default_factory=lambda: ["src"])
-    default_connection: Optional[str] = MORPH_BUILTIN_DB_CONNECTION_SLUG
-    output_paths: List[str] = Field(
-        default_factory=lambda: [
-            f"{MorphConstant.TMP_MORPH_DIR}/{{name}}/{{run_id}}{{ext()}}"
-        ]
-    )
-    scheduled_jobs: Optional[Dict[str, ScheduledJob]] = Field(default=None)
+    default_connection: Optional[str] = MORPH_DUCKDB_CONNECTION_SLUG
     result_cache_ttl: Optional[int] = Field(default=0)
+    project_id: Optional[str] = Field(default=None)
+    package_manager: str = Field(
+        default="pip", description="Package manager to use, e.g., pip or poetry."
+    )
 
     class Config:
         arbitrary_types_allowed = True
+
+
+def default_output_paths() -> List[str]:
+    project_root = find_project_root_dir()
+    if not os.access(project_root, os.W_OK):
+        return [f"{MorphConstant.TMP_MORPH_DIR}/cache/{{name}}{{ext()}}"]
+    return [f"{project_root}/.morph/cache/{{name}}{{ext()}}"]
 
 
 def default_initial_project() -> MorphProject:
@@ -67,7 +62,7 @@ def load_project(project_root: str) -> Optional[MorphProject]:
             if default_connection_dict.connection_slug is not None:
                 data["default_connection"] = default_connection_dict.connection_slug
             elif default_connection_dict.database_id is not None:
-                data["default_connection"] = MORPH_BUILTIN_DB_CONNECTION_SLUG
+                data["default_connection"] = MORPH_DUCKDB_CONNECTION_SLUG
         else:
             raise ValueError(f"Unknown connection type: {connection_type}")
 

@@ -5,22 +5,16 @@ import socket
 import subprocess
 import sys
 import threading
-import time
-import webbrowser
 from pathlib import Path
 from typing import Any, List, Optional
 
 import click
-import psutil
 from dotenv import dotenv_values, load_dotenv
 
-from morph.api.cloud.client import MorphApiClient, MorphApiKeyClientImpl
-from morph.api.cloud.types import EnvVarList
-from morph.api.cloud.utils import is_cloud
 from morph.cli.flags import Flags
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
-from morph.task.utils.morph import find_project_root_dir
+from morph.task.utils.morph import find_project_root_dir, initialize_frontend_dir
 from morph.task.utils.timezone import TimezoneManager
 
 
@@ -29,34 +23,23 @@ class ApiTask(BaseTask):
         super().__init__(args)
         self.args = args
 
+        # port
+        self.server_port = self._find_available_port(8080)
+        os.environ["MORPH_SERVER_PORT"] = str(self.server_port)
+        self.front_port = self._find_available_port(3000)
+        os.environ["MORPH_FRONT_PORT"] = str(self.front_port)
+
+        # change working directory if specified
         self.workdir = args.WORKDIR
-        if self.workdir and self.workdir != "":
+        if self.workdir:
             os.chdir(self.workdir)
-        self.is_debug = self.args.NO_LOG is False
+        else:
+            self.workdir = os.getcwd()
 
-        os.environ["MORPH_FRONT_BUILD"] = "true" if self.args.BUILD else "false"
-
-        if not is_cloud() and self.args.BUILD:
-            click.echo(
-                click.style(
-                    "Error: Build flag is only available on cloud, use 'morph build-frontend' instead.",
-                    fg="red",
-                    bg="yellow",
-                )
-            )
-            sys.exit(1)
+        os.environ["MORPH_LOCAL_DEV_MODE"] = "true"
 
         config_path = MorphConstant.MORPH_CRED_PATH
         has_config = os.path.exists(config_path)
-        if is_cloud() and not has_config:
-            click.echo(
-                click.style(
-                    f"Error: No credentials found in {config_path}.",
-                    fg="red",
-                    bg="yellow",
-                )
-            )
-            sys.exit(1)  # 1: General errors
 
         if has_config:
             # read credentials
@@ -72,31 +55,19 @@ class ApiTask(BaseTask):
                 )
                 sys.exit(1)  # 1: General errors
 
-            self.team_slug: str = config.get("default", "team_slug", fallback="")
-            self.app_url: str = config.get("default", "app_url", fallback="")
-            self.workspace_id: str = config.get(
-                "default", "workspace_id", fallback=""
-            ) or config.get("default", "database_id", fallback="")
+            # set api key
             self.api_key: str = config.get("default", "api_key", fallback="")
-
-            os.environ["MORPH_WORKSPACE_ID"] = self.workspace_id
-            os.environ["MORPH_BASE_URL"] = self.app_url
-            os.environ["MORPH_TEAM_SLUG"] = self.team_slug
             os.environ["MORPH_API_KEY"] = self.api_key
 
-        if is_cloud():
-            client = MorphApiClient(MorphApiKeyClientImpl)
-            cloud_env_vars = client.req.list_env_vars().to_model(EnvVarList)
-            if cloud_env_vars:
-                for cloud_env_var in cloud_env_vars.items:
-                    os.environ[cloud_env_var.key] = cloud_env_var.value
-        else:
-            project_root = find_project_root_dir()
-            dotenv_path = os.path.join(project_root, ".env")
-            load_dotenv(dotenv_path)
-            env_vars = dotenv_values(dotenv_path)
-            for e_key, e_val in env_vars.items():
-                os.environ[e_key] = str(e_val)
+        # load environment variables from .env file
+        self.project_root = find_project_root_dir()
+        dotenv_path = os.path.join(self.project_root, ".env")
+        load_dotenv(dotenv_path)
+        env_vars = dotenv_values(dotenv_path)
+        for e_key, e_val in env_vars.items():
+            os.environ[e_key] = str(e_val)
+
+        # set timezone if specified
         desired_tz = os.getenv("TZ")
         if desired_tz is not None:
             tz_manager = TimezoneManager()
@@ -111,263 +82,103 @@ class ApiTask(BaseTask):
             if desired_tz != tz_manager.get_current_timezone():
                 tz_manager.set_timezone(desired_tz)
 
+        # Initialize the frontend directory
+        # Copy the frontend template to ~/.morph/frontend if it doesn't exist
+        self.frontend_dir = initialize_frontend_dir(self.project_root)
+
+        # for managing subprocesses
         self.processes: List[subprocess.Popen[str]] = []
 
+    def _find_available_port(self, start_port: int, max_port: int = 65535) -> int:
+
+        port = start_port
+
+        while port <= max_port:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(("0.0.0.0", port)) != 0:
+                    return port
+            port += 1
+
+        click.echo(
+            click.style(
+                f"Error: No available port found in range {start_port}-{max_port}.",
+                fg="red",
+            )
+        )
+        sys.exit(1)
+
     def run(self):
-        if self.args.STOP:
-            for proc in psutil.process_iter(attrs=["pid", "name"]):
-                try:
-                    for conn in proc.net_connections(kind="inet"):
-                        if conn.status == "LISTEN" and (
-                            conn.laddr.port == self.args.PORT or conn.laddr.port == 3000
-                        ):
-                            try:
-                                proc.terminate()
-                            except psutil.AccessDenied:  # noqa
-                                click.echo(
-                                    click.style(
-                                        f"Error: access denied process {proc.pid}.",
-                                        fg="yellow",
-                                    ),
-                                    err=False,
-                                )
-                                exit(1)
-                except (
-                    psutil.NoSuchProcess,
-                    psutil.AccessDenied,
-                    psutil.ZombieProcess,
-                ):  # noqa
-                    pass
-        elif self.args.RESTART:
-            for proc in psutil.process_iter(attrs=["pid", "name"]):
-                try:
-                    for conn in proc.net_connections(kind="inet"):
-                        if (
-                            conn.status == "LISTEN"
-                            and conn.laddr.port == self.args.PORT
-                            or conn.laddr.port == 3000
-                        ):
-                            try:
-                                proc.terminate()
-                            except psutil.AccessDenied:  # noqa
-                                click.echo(
-                                    click.style(
-                                        f"Error: access denied process {proc.pid}.",
-                                        fg="yellow",
-                                    ),
-                                    err=False,
-                                )
-                                exit(1)
-                except (
-                    psutil.NoSuchProcess,
-                    psutil.AccessDenied,
-                    psutil.ZombieProcess,
-                ):  # noqa
-                    pass
-
-            retry_cnt = 0
-            retry_max = 5
-            while retry_cnt < retry_max:
-                try:
-                    click.echo(
-                        click.style(
-                            "Restarting server...",
-                            fg="yellow",
-                        ),
-                        err=False,
-                    )
-                    time.sleep(2)
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                        s.bind((self.args.HOST, int(self.args.PORT)))
-                    break
-                except OSError as e:
-                    if "Address already in use" in str(e):
-                        retry_cnt += 1
-                        click.echo(
-                            click.style(
-                                f"Warning: Port {self.args.PORT} is already in use. Retrying... ({retry_cnt}/{retry_max})",
-                                fg="yellow",
-                            ),
-                            err=False,
-                        )
-                    else:
-                        click.echo(
-                            click.style(
-                                f"Error: Failed to restart server: {str(e)}",
-                                fg="yellow",
-                            ),
-                            err=True,
-                        )
-                        exit(1)
-            err = False
-            try:
-                self._serve()
-            except Exception as e:
-                err = True
-                click.echo(
-                    click.style(
-                        f"Error: Failed to restart server: {str(e)}",
-                        fg="yellow",
-                    ),
-                    err=True,
-                )
-            finally:
-                if not err:
-                    click.echo(
-                        click.style(
-                            "Successfully restarted server! 🚀",
-                            fg="yellow",
-                        ),
-                        err=False,
-                    )
-        else:
-            self._serve()
-
-    def _serve(self) -> None:
-        self._setup_frontend()
-
         current_dir = Path(__file__).resolve().parent
         server_script_path = os.path.join(current_dir, "server.py")
 
-        if is_cloud():
-            self._start_frontend()
-
-            subprocess.Popen(
-                [
-                    sys.executable,
-                    server_script_path,
-                ]
-                + sys.argv[1:],
-                stdout=None,
-                stderr=None,
-            )
-        else:
-            signal.signal(signal.SIGINT, self._signal_handler)
-            try:
-                frontend_dir = os.path.join(
-                    Path(__file__).resolve().parents[1], "frontend"
+        signal.signal(signal.SIGINT, self._signal_handler)
+        try:
+            click.echo(
+                click.style(
+                    "🚀 Starting Morph server...",
+                    fg="green",
                 )
-
-                self._run_process(
-                    [sys.executable, server_script_path] + sys.argv[1:],
-                    log=self.is_debug,
-                )
-
-                click.echo(
-                    click.style(
-                        "✅ Done server setup",
-                        fg="green",
-                    )
-                )
-                self._run_process(
-                    ["npm", "run", "dev"],
-                    cwd=frontend_dir,
-                    log=False,
-                )
-                running_url = f"http://localhost:{self.args.PORT}"
-                click.echo(
-                    click.style(
-                        f"\nMorph is ready!🚀\n\n ->  Local: {running_url}\n",
-                        fg="yellow",
-                    )
-                )
-                if not is_cloud():
-                    webbrowser.open(running_url)
-                signal.pause()
-            except KeyboardInterrupt:
-                self._signal_handler(None, None)
-
-    def _setup_frontend(self) -> None:
-        click.echo(
-            click.style(
-                "Starting server ...",
-                fg="green",
-            )
-        )
-        current_dir = Path(__file__).resolve()
-        frontend_dir = os.path.join(current_dir.parents[1], "frontend")
-
-        main_tsx = os.path.join(frontend_dir, "src", "main.tsx")
-        main_base_tsx = os.path.join(frontend_dir, "src", "main-base.tsx")
-        constants_file = os.path.join(frontend_dir, "constants.js")
-        constants_base_file = os.path.join(frontend_dir, "constants-base.js")
-
-        if not self.args.BUILD:
-            rel_from_main_tsx_path = os.path.relpath(
-                os.getcwd(), start=os.path.dirname(main_tsx)
-            )
-            pages_dir_path = os.path.join(rel_from_main_tsx_path, "src", "pages")
-            pages_glob_pattern = os.path.join(pages_dir_path, "**", "*.mdx")
-            pages_path = os.path.join(
-                rel_from_main_tsx_path, "src", "pages", "${name}.mdx"
             )
 
-            with open(main_base_tsx, "r") as f:
-                m_content = f.read()
-                m_content = m_content.replace(
-                    "PAGES_GLOB_BASE_DIR_PATH", pages_dir_path
-                )
-                m_content = m_content.replace(
-                    "PAGES_GLOB_BASE_PATH", pages_glob_pattern
-                )
-                m_content = m_content.replace("PAGES_PATH", pages_path)
-            with open(main_tsx, "w", encoding="utf-8") as f:
-                f.write(m_content)
+            # run frontend
+            self._run_frontend()
 
-        rel_from_frontend_path = os.path.relpath(os.getcwd(), frontend_dir)
-        pages_dir_from_frontend_path = os.path.join(
-            rel_from_frontend_path, "src", "pages"
-        )
-        with open(constants_base_file, "r") as f:
-            c_content = f.read()
-            c_content = c_content.replace(
-                "%PAGES_GLOB_BASE_DIR_PATH_FROM_FRONTEND_ROOT%",
-                pages_dir_from_frontend_path,
+            # run server process
+            self._run_process(
+                [sys.executable, server_script_path]
+                + sys.argv[1:]
+                + ["--port", str(self.server_port)],
             )
-        with open(constants_file, "w", encoding="utf-8") as f:
-            f.write(c_content)
 
-        subprocess.run(
-            ["npm", "install"],
-            cwd=frontend_dir,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            check=True,
-        )
+            click.echo(
+                click.style(
+                    "✅ Done server setup",
+                    fg="green",
+                )
+            )
 
-    def _start_frontend(self) -> None:
-        current_dir = Path(__file__).resolve()
-        frontend_dir = os.path.join(current_dir.parents[1], "frontend")
-        if self.args.BUILD:
+            running_url = f"http://localhost:{self.server_port}"
+            click.echo(
+                click.style(
+                    f"\nMorph is running!🚀\n\n ->  Local: {running_url}\n",
+                    fg="yellow",
+                )
+            )
+            signal.pause()
+        except KeyboardInterrupt:
+            self._signal_handler(None, None)
+
+    def _run_frontend(self) -> None:
+        try:
             subprocess.run(
-                ["npm", "run", "build"],
-                cwd=frontend_dir,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                text=True,
-                start_new_session=True,
+                "npm install",
+                cwd=self.frontend_dir,
+                shell=True,
+                check=True,
             )
-        else:
-            subprocess.Popen(
-                ["npm", "run", "dev"],
-                cwd=frontend_dir,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                text=True,
-                start_new_session=True,
+        except subprocess.CalledProcessError:
+            click.echo(
+                click.style("Failed to install frontend dependencies.", fg="yellow")
             )
+            exit(1)
+
+        self._run_process(
+            ["npm", "run", "dev", "--port", f"{self.front_port}"],
+            cwd=self.frontend_dir,
+            is_debug=False,
+        )
 
     def _run_process(
-        self, command: List[str], cwd: Optional[str] = None, log: Optional[bool] = True
+        self,
+        command: List[str],
+        cwd: Optional[str] = None,
+        is_debug: Optional[bool] = True,
     ) -> None:
         process = subprocess.Popen(
             command,
             cwd=cwd,
-            stdout=subprocess.PIPE if log else subprocess.DEVNULL,
-            stderr=subprocess.PIPE if log else subprocess.DEVNULL,
+            stdout=subprocess.PIPE if is_debug else subprocess.DEVNULL,
+            stderr=subprocess.PIPE if is_debug else subprocess.DEVNULL,
             text=True,
         )
 
@@ -395,13 +206,9 @@ class ApiTask(BaseTask):
             else:
                 return "white"
 
-        if log:
-            threading.Thread(
-                target=log_output, args=(process.stdout,), daemon=True
-            ).start()
-            threading.Thread(
-                target=log_output, args=(process.stderr,), daemon=True
-            ).start()
+        if is_debug:
+            threading.Thread(target=log_output, args=(process.stdout,)).start()
+            threading.Thread(target=log_output, args=(process.stderr,)).start()
 
         self.processes.append(process)
 
