@@ -1,12 +1,5 @@
-# Base image for AWS Lambda
-FROM public.ecr.aws/lambda/python:3.9
-
-RUN yum install -y \
-    postgresql-devel \
-    git \
-    gcc \
-    gcc-c++ && \
-    yum clean all
+# Base image for Morph Cloud
+FROM public.ecr.aws/i1l4z0u0/morph-cloud:python3.9
 
 # Set working directory
 WORKDIR /var/task
