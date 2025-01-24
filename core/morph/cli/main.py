@@ -167,7 +167,6 @@ def deploy(
 
 @cli.command("serve")
 @params.workdir
-@params.preview
 @click.pass_context
 @global_flags
 @requires.preflight
