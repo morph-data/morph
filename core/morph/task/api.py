@@ -36,8 +36,7 @@ class ApiTask(BaseTask):
         else:
             self.workdir = os.getcwd()
 
-        self.is_preview = args.PREVIEW or False
-        os.environ["MORPH_LOCAL_DEV_MODE"] = "false" if self.args.PREVIEW else "true"
+        os.environ["MORPH_LOCAL_DEV_MODE"] = "true"
 
         config_path = MorphConstant.MORPH_CRED_PATH
         has_config = os.path.exists(config_path)
@@ -163,22 +162,11 @@ class ApiTask(BaseTask):
             )
             exit(1)
 
-        if self.is_preview:
-            subprocess.run(
-                ["npm", "run", "build"],
-                cwd=self.frontend_dir,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                text=True,
-                start_new_session=True,
-            )
-        else:
-            self._run_process(
-                ["npm", "run", "dev", "--port", f"{self.front_port}"],
-                cwd=self.frontend_dir,
-                is_debug=False,
-            )
+        self._run_process(
+            ["npm", "run", "dev", "--port", f"{self.front_port}"],
+            cwd=self.frontend_dir,
+            is_debug=False,
+        )
 
     def _run_process(
         self,
