@@ -126,12 +126,6 @@ project_id = click.option(
     help="Specify the project id.",
 )
 
-preview = click.option(
-    "--preview",
-    is_flag=True,
-    help="Serve application with pre-built frontend assets locally to simulate a production environment for testing.",
-)
-
 no_cache = click.option(
     "--no-cache",
     is_flag=True,
