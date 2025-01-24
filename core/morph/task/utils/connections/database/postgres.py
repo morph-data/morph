@@ -31,7 +31,10 @@ class PostgresqlConnector:
         host = "localhost" if local_port else self.connection.host
         port = local_port if local_port else self.connection.port
         database = self.connection.dbname
-        return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}?connect_timeout={CONNECTION_TIMEOUT}"
+        db_url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}?connect_timeout={CONNECTION_TIMEOUT}"
+        if self.connection.timezone:
+            db_url += f"&options=-c timezone={self.connection.timezone}"
+        return db_url
 
     def _start_ssh_tunnel(self):
         from paramiko import RSAKey
