@@ -16,10 +16,9 @@ import {
   SelectItem,
   SelectSeparator,
   SelectItems,
-  StateValue,
   DatePicker,
   DateRangePicker,
-} from "@use-morph/components";
+} from "@morph-data/components";
 import { MDXComponents } from "mdx/types";
 
 export const customMDXComponents: MDXComponents = {
@@ -28,7 +27,6 @@ export const customMDXComponents: MDXComponents = {
   Metrics,
   MetricsGrid,
   Input,
-  StateValue,
   Select,
   SelectGroup,
   SelectGroupLabel,
