@@ -427,8 +427,6 @@ def _regist_sql_data_requirements(resource: MorphFunctionMetaObject) -> List[str
             function=resource.function,
             description=resource.description,
             title=resource.title,
-            schemas=resource.schemas,
-            terms=resource.terms,
             variables=resource.variables,
             data_requirements=load_data,
             output_paths=resource.output_paths,
