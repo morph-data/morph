@@ -1,31 +1,10 @@
-import { defineConfig, Plugin } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import { resolve } from "path";
 import ViteRestart from "vite-plugin-restart";
-
 import mdx from "@mdx-js/rollup";
 import remarkGfm from "remark-gfm";
 import rehypePrettyCode from "rehype-pretty-code";
-
-function addImportToMDX(): Plugin {
-  return {
-    name: "add-import-to-mdx",
-    enforce: "pre",
-    transform(code, id) {
-      // onnly mdx
-      if (id.endsWith(".mdx")) {
-        if (!code.includes("import { state } from '@use-morph/components'")) {
-          // add import
-          return {
-            code: `import { state } from '@use-morph/components';\n${code}`,
-            map: null,
-          };
-        }
-      }
-      return null;
-    },
-  };
-}
 
 /** @type {import('rehype-pretty-code').Options} */
 const prettyCodeOptions = { theme: "github-dark" };
@@ -41,7 +20,6 @@ export default defineConfig((env) => ({
         rehypePlugins: [[rehypePrettyCode, prettyCodeOptions]],
       }),
     },
-    addImportToMDX(),
     ViteRestart({
       restart: ["../../src/pages/**/*"],
     }),

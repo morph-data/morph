@@ -3,11 +3,12 @@ import { createRoot } from "react-dom/client";
 import { createInertiaApp } from "@inertiajs/react";
 import React, { StrictMode } from "react";
 import { PageSkeleton } from "./page-skeleton.tsx";
-import "@use-morph/components/css";
+import "@morph-data/components/css";
 import { MDXComponents } from "mdx/types";
 import { customMDXComponents } from "./custom-mdx-components.tsx";
 import { AdminPage } from "./admin/AdminPage.tsx";
 import { ErrorPage } from "./error-page.tsx";
+import { useRefresh } from "@morph-data/components";
 
 type MDXProps = {
   children?: React.ReactNode;
@@ -57,21 +58,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const WrappedComponent: React.FC<{ showAdminPage: boolean }> = ({
         showAdminPage,
-      }) => (
-        <PageSkeleton
-          routes={routes}
-          title={name}
-          showAdminPage={showAdminPage}
-        >
-          {name === "morph" ? (
-            <AdminPage />
-          ) : pageModule ? (
-            <pageModule.default components={customMDXComponents} />
-          ) : (
-            <ErrorPage routes={routes} />
-          )}
-        </PageSkeleton>
-      );
+      }) => {
+        useRefresh();
+
+        return (
+          <PageSkeleton
+            routes={routes}
+            title={name}
+            showAdminPage={showAdminPage}
+          >
+            {name === "morph" ? (
+              <AdminPage />
+            ) : pageModule ? (
+              <pageModule.default components={customMDXComponents} />
+            ) : (
+              <ErrorPage routes={routes} />
+            )}
+          </PageSkeleton>
+        );
+      };
 
       return WrappedComponent;
     },

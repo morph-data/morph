@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   Button,
   DropdownMenuSeparator,
-} from "@use-morph/components";
+} from "@morph-data/components";
 import { ErrorBoundary, FallbackProps } from "react-error-boundary";
 import { Link } from "@inertiajs/react";
 
