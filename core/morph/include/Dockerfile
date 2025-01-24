@@ -1,19 +1,12 @@
-# Base image for AWS Lambda
-FROM public.ecr.aws/lambda/python:3.9
-
-RUN yum install -y \
-    postgresql-devel \
-    git \
-    gcc \
-    gcc-c++ && \
-    yum clean all
+# Base image for Morph Cloud
+FROM public.ecr.aws/i1l4z0u0/morph-cloud:python3.9
 
 # Set working directory
 WORKDIR /var/task
 
 # Install Python dependencies with poetry
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
+RUN pip install --no-cache-dir -r requirements.txt --target "${MORPH_TASK_ROOT}"
 
 # Copy source code and dependencies
 COPY .morph/frontend/dist /var/task/.morph/frontend/dist
