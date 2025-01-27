@@ -113,6 +113,12 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
         return self.request(method="GET", path=path)
 
     @validate_project_id
+    def verify_api_secret(self) -> MorphClientResponse:
+        path = "api-secret/verify"
+        body = {"projectId": self.project_id}
+        return self.request(method="POST", path=path, data=body)
+
+    @validate_project_id
     def initiate_deployment(
         self, project_id: str, image_build_log: str, image_checksum: str
     ) -> MorphClientResponse:

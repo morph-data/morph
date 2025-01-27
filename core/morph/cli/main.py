@@ -197,3 +197,21 @@ def init(
     task = InitTask(ctx.obj["flags"])
     results = task.run()
     return results, True
+
+
+@cli.command("context")
+@params.output
+@click.pass_context
+@global_flags
+@requires.preflight
+@requires.postflight
+def context(
+    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
+) -> Tuple[None, bool]:
+    """Print or save the user information context."""
+    from morph.task.context import ContextTask
+
+    task = ContextTask(ctx.obj["flags"])
+    task.run()
+
+    return None, True
