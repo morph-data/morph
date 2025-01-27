@@ -36,6 +36,9 @@ class NewTask(BaseTask):
         # Copy the frontend template to ~/.morph/frontend if it doesn't exist
         initialize_frontend_dir(self.project_root)
 
+        # Select the Python version for the project
+        self.selected_python_version = self._select_python_version()
+
     def run(self):
         click.echo("Creating new Morph project...")
 
@@ -120,9 +123,28 @@ class NewTask(BaseTask):
             click.echo()
             sys.exit(1)
 
-        # Copy the selected Dockerfile to the project directory
+        # Generate the Dockerfile with the selected Python version
         dockerfile_path = os.path.join(self.project_root, "Dockerfile")
-        shutil.copy2(docker_template_file, dockerfile_path)
+        try:
+            with docker_template_file.open("r", encoding="utf-8") as f:
+                dockerfile_content = f.read()
+
+            # Replace the placeholder with the selected Python version
+            dockerfile_content = dockerfile_content.replace(
+                "${MORPH_PYTHON_VERSION}", self.selected_python_version
+            )
+
+            # Write the updated Dockerfile to the project directory
+            with open(dockerfile_path, "w") as output_file:
+                output_file.write(dockerfile_content)
+        except FileNotFoundError as e:
+            click.echo(
+                click.style(f"Error: Template Dockerfile not found: {e}", fg="red")
+            )
+            sys.exit(1)
+        except IOError as e:
+            click.echo(click.style(f"Error: Unable to write Dockerfile: {e}", fg="red"))
+            sys.exit(1)
 
         try:
             morph_data_version = importlib.metadata.version("morph-data")
@@ -218,3 +240,64 @@ class NewTask(BaseTask):
                 click.style("Warning: Git not found or command failed.", fg="yellow")
             )
             return None
+
+    @staticmethod
+    def _select_python_version() -> str:
+        """
+        Prompt the user to select a Python version for the project setup.
+        """
+        supported_versions = ["3.9", "3.10", "3.11", "3.12"]
+        current_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+
+        if current_version not in supported_versions:
+            click.echo(
+                click.style(
+                    f"Warning: Current Python version ({current_version}) is not officially supported.",
+                    fg="yellow",
+                )
+            )
+
+        click.echo()
+        click.echo("Select the Python version for your project:")
+        for idx, version in enumerate(supported_versions, start=1):
+            if version == current_version:
+                click.echo(click.style(f"{idx}: {version} (current)", fg="blue"))
+            else:
+                click.echo(f"{idx}: {version}")
+
+        click.echo(
+            click.style("Enter the number of your choice. (default is ["), nl=False
+        )
+        click.echo(click.style(f"{current_version}", fg="blue"), nl=False)
+        click.echo(click.style("]): "), nl=False)
+
+        version_choice = input().strip()
+
+        try:
+            selected_version = supported_versions[int(version_choice) - 1]
+            print_version_warning = False
+        except ValueError:
+            # If the input is empty, default to the current Python version (No warning)
+            selected_version = current_version
+            print_version_warning = False
+        except IndexError:
+            # If the input is invalid, default to the current Python version (with warning)
+            selected_version = current_version
+            print_version_warning = True
+
+        if print_version_warning:
+            click.echo(
+                click.style(
+                    f"Invalid choice. Defaulting to current Python version: {selected_version}",
+                    fg="yellow",
+                )
+            )
+        else:
+            click.echo(
+                click.style(
+                    f"The selected Python [{selected_version}] version will be used for the project.",
+                    fg="blue",
+                )
+            )
+
+        return selected_version
