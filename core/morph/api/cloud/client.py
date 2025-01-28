@@ -1,5 +1,6 @@
 import configparser
 import os
+from functools import wraps
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, cast
 
 from morph.api.cloud.base import MorphApiBaseClient, MorphClientResponse
@@ -8,6 +9,18 @@ from morph.constants import MorphConstant
 from morph.task.utils.morph import find_project_root_dir
 
 MORPH_API_BASE_URL = "https://api.morph-data.io/v0"
+
+
+def validate_project_id(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        if not hasattr(self, "project_id") or not self.project_id:
+            raise ValueError(
+                "No project id found. Please fill project_id in morph_project.yml"
+            )
+        return method(self, *args, **kwargs)
+
+    return wrapper
 
 
 class MorphApiKeyClientImpl(MorphApiBaseClient):
@@ -22,16 +35,9 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
         project = load_project(find_project_root_dir())
         if project is None:
             raise ValueError("No project found.")
-        if project.project_id is None:
-            raise ValueError(
-                "No project id found. Please fill project_id in morph_project.yml"
-            )
-        if project.profile is None:
-            raise ValueError(
-                "No profile found. Please fill profile in morph_project.yml"
-            )
+        profile = project.profile or "default"
 
-        self.project_id = os.environ.get("MORPH_PROJECT_ID", project.project_id)
+        self.project_id = os.environ.get("MORPH_PROJECT_ID", project.project_id or "")
 
         self.api_key = os.environ.get("MORPH_API_KEY", "")
         if not self.api_key:
@@ -42,14 +48,14 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
                 )
             config = configparser.ConfigParser()
             config.read(config_path)
-            if not config.has_section(project.profile):
+            if not config.has_section(profile):
                 raise ValueError(
-                    f"No profile '{project.profile}' found in the credentials file."
+                    f"No profile '{profile}' found in the credentials file."
                 )
-            self.api_key = config.get(project.profile, "api_key", fallback="")
+            self.api_key = config.get(profile, "api_key", fallback="")
 
         if not self.api_key:
-            raise ValueError(f"No API key found for profile '{project.profile}'.")
+            raise ValueError(f"No API key found for profile '{profile}'.")
 
     def get_headers(self) -> Dict[str, Any]:
         return {
@@ -61,28 +67,28 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
     def get_base_url(self) -> str:
         return self.api_url
 
+    @validate_project_id
     def find_database_connection(self) -> MorphClientResponse:
         path = f"project/{self.project_id}/connection"
         return self.request(method="GET", path=path)
 
+    @validate_project_id
     def find_external_connection(self, connection_slug: str) -> MorphClientResponse:
         path = f"external-connection/{connection_slug}"
         return self.request(method="GET", path=path)
 
-    def list_external_connections(self) -> MorphClientResponse:
-        path = "external-connection"
-        query = {"withAuth": True}
-        return self.request(method="GET", path=path, query=query)
-
+    @validate_project_id
     def list_env_vars(self) -> MorphClientResponse:
         path = "env-vars"
         return self.request(method="GET", path=path)
 
+    @validate_project_id
     def override_env_vars(self, env_vars: List[EnvVarObject]) -> MorphClientResponse:
         path = "env-vars/override"
         body = {"envVars": [env_var.model_dump() for env_var in env_vars]}
         return self.request(method="POST", path=path, data=body)
 
+    @validate_project_id
     def list_fields(
         self,
         table_name: str,
@@ -106,6 +112,13 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
         path = "api-secret/check"
         return self.request(method="GET", path=path)
 
+    @validate_project_id
+    def verify_api_secret(self) -> MorphClientResponse:
+        path = "api-secret/verify"
+        body = {"projectId": self.project_id}
+        return self.request(method="POST", path=path, data=body)
+
+    @validate_project_id
     def initiate_deployment(
         self, project_id: str, image_build_log: str, image_checksum: str
     ) -> MorphClientResponse:
@@ -118,6 +131,7 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
 
         return self.request(method="POST", path=path, data=body)
 
+    @validate_project_id
     def execute_deployment(
         self, user_function_deployment_id: str
     ) -> MorphClientResponse:
