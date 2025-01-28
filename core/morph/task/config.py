@@ -1,6 +1,7 @@
 import configparser
 import os
 import socket
+import sys
 
 import click
 
@@ -45,7 +46,7 @@ class ConfigTask(BaseTask):
                     fg="red",
                 )
             )
-            exit(1)
+            sys.exit(1)
         click.echo(click.style("✅ Verified", fg="green"))
 
         # Load existing file or create new one if it doesn't exist
@@ -54,11 +55,26 @@ class ConfigTask(BaseTask):
         if os.path.exists(cred_file):
             config.read(cred_file)
 
-        # Update the settings in the specific section
-        if not config.has_section(profile_name):
-            click.echo("Creating new credentials...")
+        # Warn user if profile already exists and prompt for overwrite
+        if config.has_section(profile_name):
+            warning_message = click.style(
+                f"Warning: Profile '{profile_name}' already exists. Overwrite?",
+                fg="yellow",
+            )
+            confirm = click.confirm(warning_message, default=False)
+            if not confirm:
+                click.echo(
+                    click.style(
+                        "Operation canceled. No credentials overwritten.",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+            click.echo("Overwriting existing credentials...")
         else:
-            click.echo("Credentials already exist. Updating...")
+            click.echo("Creating new credentials...")
+
+        # Update the settings in the specific section
         config[profile_name] = {
             "api_key": api_key,
         }
@@ -70,7 +86,7 @@ class ConfigTask(BaseTask):
         click.echo(f"Credentials saved to {cred_file}")
         click.echo(
             click.style(
-                f"✅ Successfully setup! This profile can be access by profile name '{profile_name}' via morph cli.",
+                f"✅ Successfully setup! This profile can be accessed by profile name '{profile_name}' via morph cli.",
                 fg="green",
             )
         )
