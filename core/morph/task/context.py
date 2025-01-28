@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 from pathlib import Path
@@ -6,6 +5,7 @@ from pathlib import Path
 import click
 
 from morph.api.cloud.client import MorphApiKeyClientImpl
+from morph.api.cloud.types import UserInfo
 from morph.cli.flags import Flags
 from morph.config.project import load_project
 from morph.task.base import BaseTask
@@ -57,6 +57,6 @@ class ContextTask(BaseTask):
             if Path(self.output).parent != Path("."):
                 os.makedirs(os.path.dirname(self.output), exist_ok=True)
             with open(self.output, "w") as f:
-                f.write(json.dumps(response_json["user"], indent=4))
+                f.write(UserInfo(**response_json["user"]).model_dump_json(indent=4))
         else:
-            click.echo(json.dumps(response_json["user"], indent=4))
+            click.echo(UserInfo(**response_json["user"]).model_dump_json(indent=4))
