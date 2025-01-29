@@ -74,12 +74,12 @@ class ApiTask(BaseTask):
             if not tz_manager.is_valid_timezone(desired_tz):
                 click.echo(
                     click.style(
-                        f"Warning: Invalid TZ value in .env. Falling back to {tz_manager.get_current_timezone()}.",
+                        "Warning: Invalid TZ value in .env. Falling back to system timezone.",
                         fg="yellow",
                     ),
                     err=False,
                 )
-            if desired_tz != tz_manager.get_current_timezone():
+            else:
                 tz_manager.set_timezone(desired_tz)
 
         # Initialize the frontend directory
