@@ -5,6 +5,8 @@ import ViteRestart from "vite-plugin-restart";
 import mdx from "@mdx-js/rollup";
 import remarkGfm from "remark-gfm";
 import rehypePrettyCode from "rehype-pretty-code";
+import rehypeExtractToc from "@stefanprobst/rehype-extract-toc";
+import rehypeExtractTocMdxExport from "@stefanprobst/rehype-extract-toc/mdx";
 
 /** @type {import('rehype-pretty-code').Options} */
 const prettyCodeOptions = { theme: "github-dark" };
@@ -17,7 +19,11 @@ export default defineConfig((env) => ({
       enforce: "pre",
       ...mdx({
         remarkPlugins: [remarkGfm],
-        rehypePlugins: [[rehypePrettyCode, prettyCodeOptions]],
+        rehypePlugins: [
+          [rehypePrettyCode, prettyCodeOptions],
+          rehypeExtractToc,
+          rehypeExtractTocMdxExport,
+        ],
       }),
     },
     ViteRestart({

@@ -5,6 +5,7 @@ import React, { StrictMode } from "react";
 import { PageSkeleton } from "./page-skeleton.tsx";
 import "@morph-data/components/css";
 import { MDXComponents } from "mdx/types";
+import type { Toc } from "@stefanprobst/rehype-extract-toc";
 import { customMDXComponents } from "./custom-mdx-components.tsx";
 import { AdminPage } from "./admin/AdminPage.tsx";
 import { ErrorPage } from "./error-page.tsx";
@@ -17,7 +18,11 @@ type MDXProps = {
 
 export type MDXComponent = (props: MDXProps) => JSX.Element;
 
-type PageModule = { default: MDXComponent }; // types MDX default export
+type PageModule = {
+  default: MDXComponent;
+  title?: string;
+  tableOfContents?: Toc;
+}; // types MDX default export
 type Pages = Record<string, PageModule>;
 
 const pages: Pages = import.meta.glob<true, string, PageModule>(
@@ -39,9 +44,17 @@ const normalizePath = (filePath: string) => {
 const routes = Object.entries(pages).map(([filePath, module]) => {
   // Extract the exported title from the MDX file
   const title = (() => {
-    if ("title" in module) {
+    if (moduile.title) {
       return String(module.title);
     }
+
+    if (module.tableOfContents && module.tableOfContents.length > 0) {
+      const firstHeading = module.tableOfContents[0];
+      if (firstHeading) {
+        return firstHeading.value;
+      }
+    }
+
     return "Untitled";
   })();
 
