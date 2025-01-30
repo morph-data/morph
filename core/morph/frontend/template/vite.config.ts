@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import rehypePrettyCode from "rehype-pretty-code";
 import rehypeExtractToc from "@stefanprobst/rehype-extract-toc";
 import rehypeExtractTocMdxExport from "@stefanprobst/rehype-extract-toc/mdx";
+import rehypeSlug from "rehype-slug";
 
 /** @type {import('rehype-pretty-code').Options} */
 const prettyCodeOptions = { theme: "github-dark" };
@@ -20,6 +21,7 @@ export default defineConfig((env) => ({
       ...mdx({
         remarkPlugins: [remarkGfm],
         rehypePlugins: [
+          rehypeSlug,
           [rehypePrettyCode, prettyCodeOptions],
           rehypeExtractToc,
           rehypeExtractTocMdxExport,

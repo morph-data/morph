@@ -61,6 +61,7 @@ const routes = Object.entries(pages).map(([filePath, module]) => {
   return {
     path: normalizePath(filePath),
     title,
+    toc: module.tableOfContents,
   };
 });
 
@@ -77,8 +78,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return (
           <PageSkeleton
             routes={routes}
-            title={name}
+            title={pageModule?.title || "Untitled"}
             showAdminPage={showAdminPage}
+            toc={pageModule?.tableOfContents}
           >
             {name === "morph" ? (
               <AdminPage />
