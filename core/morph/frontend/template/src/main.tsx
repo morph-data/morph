@@ -44,7 +44,7 @@ const normalizePath = (filePath: string) => {
 const routes = Object.entries(pages).map(([filePath, module]) => {
   // Extract the exported title from the MDX file
   const title = (() => {
-    if (moduile.title) {
+    if (module.title) {
       return String(module.title);
     }
 
