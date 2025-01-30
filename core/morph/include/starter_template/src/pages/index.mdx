@@ -1,19 +1,59 @@
-export const title = "Starter App"
+import { defineState } from '@morph-data/components';
+export const { chartType } = defineState({ chartType: 'stacked' });
+export const title = "Marketing campaign report"
 
-# Starter App
+# Marketing campaign report
 
-Morph is a full-stack framework for building data apps using Python, SQL and MDX.
+SQL, Python and MDX.
 
-`<DataTable/>` `<Embed/>` can access data from sql and python.
-You can find UI components [in the docs](https://docs.morph-data.io).
+This report shows the traffic and orders data from our marketing campaigns across different sources. The data spans from 2023 to 2025, tracking both traffic volume and resulting orders.
 
-## Data
+Key points:
+- Traffic and orders are tracked monthly
+- Data is segmented by traffic source (Coupon, Google Organic, etc.)
+- Interactive visualizations allow different views of the data
+- Raw data is available in the table below
 
-<Grid cols="2">
-  <div>
-    <DataTable loadData="example_data" height={300} />
-  </div>
-  <div>
-    <Embed loadData="example_chart" height={300} />
-  </div>
-</Grid>
+<Accordion title="About the Data">
+  <p>
+    This report is based on the following data retrieved by DuckDB:
+  </p>
+```sql
+select
+  Date as data,
+  Source as source,
+  Traffic as traffic,
+  Orders as orders
+from
+  read_csv("data/Traffic_Orders_Demo_Data.csv")
+where
+  Date >= '2023-01-01'
+```
+</Accordion>
+
+## Campagin Result
+
+<MetricsGrid
+  loadData="example_metrics"
+  cols="2"
+  value="value"
+  label="label"
+/>
+
+### Chart
+
+<div className="py-4">
+  <Select state={chartType}>
+    <SelectItem value="stacked">Stacked chart</SelectItem>
+    <SelectItem value="line">Line chart</SelectItem>
+    <SelectItem value="area">Area chart</SelectItem>
+  </Select>
+</div>
+
+<Embed
+  loadData="example_chart"
+  height={300}
+  variables={{
+    chartType: chartType.value
+  }}
+/>
