@@ -131,6 +131,7 @@ def run(
 
 @cli.command("clean")
 @params.verbose
+@params.force
 @click.pass_context
 @global_flags
 @requires.preflight

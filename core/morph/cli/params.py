@@ -138,3 +138,10 @@ output = click.option(
     type=str,
     help="Specify output file path.",
 )
+
+force = click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Force execution.",
+)
