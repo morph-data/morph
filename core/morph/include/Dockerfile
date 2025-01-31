@@ -1,5 +1,5 @@
 # Base image for Morph Cloud
-FROM public.ecr.aws/i1l4z0u0/morph-cloud:python3.9
+FROM public.ecr.aws/i1l4z0u0/morph-cloud:python${MORPH_PYTHON_VERSION}
 
 # Set working directory
 WORKDIR /var/task

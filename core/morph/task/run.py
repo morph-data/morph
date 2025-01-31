@@ -189,9 +189,9 @@ class RunTask(BaseTask):
             tz_manager = TimezoneManager()
             if not tz_manager.is_valid_timezone(desired_tz):
                 self.logger.warning(
-                    f"Invalid TZ value in .env. Falling back to {tz_manager.get_current_timezone()}."
+                    "Warning: Invalid TZ value in .env. Falling back to system timezone.",
                 )
-            if desired_tz != tz_manager.get_current_timezone():
+            else:
                 tz_manager.set_timezone(desired_tz)
 
     def run(self) -> Any:
