@@ -74,7 +74,7 @@ def transform_output(resource: MorphFunctionMetaObject, output: Any) -> Any:
     def try_parquet_conversion(df):
         try:
             return df.to_parquet(index=False, engine="pyarrow")
-        except (pyarrow.lib.ArrowInvalid, ValueError) as e:
+        except (pyarrow.lib.ArrowInvalid, pyarrow.lib.ArrowTypeError, ValueError) as e:
             click.echo(
                 click.style(
                     f"Warning: Converting problematic columns to string. [{e}]",
@@ -122,6 +122,7 @@ def transform_output(resource: MorphFunctionMetaObject, output: Any) -> Any:
                 _get_html_from_plotly_image(output, "html"),
                 _get_html_from_plotly_image(output, "png"),
             ]
+
     return transformed_output
 
 

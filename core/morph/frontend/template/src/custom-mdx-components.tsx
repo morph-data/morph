@@ -6,6 +6,7 @@ import {
   Embed,
   Grid,
   LLM,
+  Chat,
   Metrics,
   MetricsGrid,
   Panel,
@@ -39,6 +40,7 @@ export const customMDXComponents: MDXComponents = {
   Accordion,
   Callout,
   LLM,
+  Chat,
   DatePicker,
   DateRangePicker,
 };

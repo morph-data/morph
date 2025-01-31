@@ -6,9 +6,11 @@ import {
   DropdownMenuItem,
   Button,
   DropdownMenuSeparator,
+  Toc,
 } from "@morph-data/components";
 import { ErrorBoundary, FallbackProps } from "react-error-boundary";
 import { Link } from "@inertiajs/react";
+import { Toc as TocEntries } from "@stefanprobst/rehype-extract-toc";
 
 function fallbackRender({ error }: FallbackProps) {
   // Call resetErrorBoundary() to reset the error boundary and retry the render.
@@ -24,6 +26,7 @@ type PageSkeletonProps = React.PropsWithChildren<{
   routes: Array<{ path: string; title: string }>;
   title: string;
   showAdminPage: boolean;
+  toc?: TocEntries;
 }>;
 
 export const PageSkeleton: React.FC<PageSkeletonProps> = (props) => {
@@ -52,10 +55,14 @@ export const PageSkeleton: React.FC<PageSkeletonProps> = (props) => {
                 </svg>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="start" className="w-60">
               {props.routes.map((route) => (
                 <Link href={route.path} key={route.path}>
-                  <DropdownMenuItem>{route.title}</DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <span className="truncate max-w-full w-full">
+                      {route.title}
+                    </span>
+                  </DropdownMenuItem>
                 </Link>
               ))}
               {props.showAdminPage && (
@@ -81,7 +88,14 @@ export const PageSkeleton: React.FC<PageSkeletonProps> = (props) => {
             </a>
           </div>
         </div>
-        <div className="mt-4 p-2">{props.children}</div>
+        <div className="mt-4 p-2">
+          <div className="grid gap-4 grid-cols-[1fr_32px] lg:grid-cols-[1fr_180px]">
+            <div className="p-2">{props.children}</div>
+            <div>
+              <Toc toc={props.toc} className="sticky top-10 right-10 h-fit" />
+            </div>
+          </div>
+        </div>
       </div>
     </ErrorBoundary>
   );

@@ -1,0 +1,20 @@
+export const title = "AI Agent"
+
+### Chat with SQL Agent
+
+<Callout title="Warning" variant="warning">
+To use this feature, please set your `OPENAI_API_KEY` in `.env` file.
+
+After setting the API key, let's ask "What is the total traffic and orders for each source?"
+</Callout>
+
+You can ask questions to the SQL Agent about the data and get the answer in SQL.
+
+<Grid cols={2} className="py-4">
+  <div>
+    <DataTable loadData="example_data" height={400} />
+  </div>
+  <div className="p-4 bg-gray-50 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <LLM postData="sql_agent" />
+  </div>
+</Grid>
