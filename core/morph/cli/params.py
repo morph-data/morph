@@ -131,3 +131,17 @@ no_cache = click.option(
     is_flag=True,
     help="Disable cache.",
 )
+
+output = click.option(
+    "--output",
+    "-o",
+    type=str,
+    help="Specify output file path.",
+)
+
+force = click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Force execution.",
+)

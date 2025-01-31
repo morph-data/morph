@@ -41,6 +41,14 @@ class DeployTask(BaseTask):
         if not project:
             click.echo(click.style("Project configuration not found.", fg="red"))
             sys.exit(1)
+        elif project.project_id is None:
+            click.echo(
+                click.style(
+                    "Error: No project id found. Please fill project_id in morph_project.yml.",
+                    fg="red",
+                )
+            )
+            sys.exit(1)
         self.package_manager = project.package_manager
 
         # Check Dockerfile existence
