@@ -15,6 +15,9 @@ from morph import MorphGlobalContext
 def sql_agent(
     context: MorphGlobalContext,
 ) -> Generator[MorphChatStreamChunk, None, None]:
+    if os.getenv("OPENAI_API_KEY") is None:
+        yield stream_chat("Please set your OPENAI_API_KEY in .env file.")
+        return
     # context.user_info comes from user's authentication info.
     if context.user_info is None or "Admin" not in context.user_info["roles"]:
         yield stream_chat("You are not authorized to use this feature.")
