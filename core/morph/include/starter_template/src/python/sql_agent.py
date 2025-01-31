@@ -3,7 +3,7 @@ import os
 from typing import Generator
 
 from morph_lib.database import execute_sql
-from morph_lib.stream import create_chunk
+from morph_lib.stream import stream_chat
 from morph_lib.types import MorphChatStreamChunk
 from openai import OpenAI
 
@@ -17,7 +17,7 @@ def sql_agent(
 ) -> Generator[MorphChatStreamChunk, None, None]:
     # context.user_info comes from user's authentication info.
     if context.user_info is None or "Admin" not in context.user_info["roles"]:
-        yield create_chunk("You are not authorized to use this feature.")
+        yield stream_chat("You are not authorized to use this feature.")
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     prompt = context.vars["prompt"]
@@ -67,7 +67,7 @@ As a source, you have the following data:
 
     response_json = json.loads(response.choices[0].message.function_call.arguments)
     sql = response_json["sql"]
-    yield create_chunk(
+    yield stream_chat(
         f"""
 ## SQL Query
 ```sql
@@ -77,7 +77,7 @@ As a source, you have the following data:
     )
     data = execute_sql(sql, "DUCKDB")
     data_md = data.to_markdown(index=False)
-    yield create_chunk(
+    yield stream_chat(
         f"""
 {data_md}
 """
@@ -101,4 +101,4 @@ You can use the following data:
     )
 
     for chunk in response:
-        yield create_chunk(chunk.choices[0].delta.content)
+        yield stream_chat(chunk.choices[0].delta.content)
