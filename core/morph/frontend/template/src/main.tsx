@@ -1,7 +1,7 @@
 import "vite/modulepreload-polyfill";
 import { createRoot } from "react-dom/client";
 import { createInertiaApp } from "@inertiajs/react";
-import React, { StrictMode } from "react";
+import React, { StrictMode, useMemo } from "react";
 import { PageSkeleton } from "./page-skeleton.tsx";
 import "@morph-data/components/css";
 import { MDXComponents } from "mdx/types";
@@ -75,10 +75,20 @@ document.addEventListener("DOMContentLoaded", () => {
       }) => {
         useRefresh();
 
+        const firstHeading = useMemo(() => {
+          if (
+            pageModule?.tableOfContents &&
+            pageModule.tableOfContents.length > 0
+          ) {
+            return pageModule.tableOfContents[0];
+          }
+          return null;
+        }, []);
+
         return (
           <PageSkeleton
             routes={routes}
-            title={pageModule?.title || "Untitled"}
+            title={pageModule?.title || firstHeading?.value || "Untitled"}
             showAdminPage={showAdminPage}
             toc={pageModule?.tableOfContents}
           >
