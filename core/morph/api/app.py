@@ -1,3 +1,4 @@
+import importlib.util
 import os
 from pathlib import Path
 from typing import Annotated
@@ -22,6 +23,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from morph.api.error import ApiBaseError, InternalError
 from morph.api.handler import router
+from morph.api.plugin import plugin_app
 
 # configuration values
 
@@ -138,6 +140,31 @@ async def health_check():
 
 
 app.include_router(router)
+
+
+def import_plugins():
+    plugin_dir = Path(os.getcwd()) / "src/plugin"
+    if plugin_dir.exists():
+        for file in plugin_dir.glob("**/*.py"):
+            if (
+                file.stem.startswith("__") or file.stem.startswith(".")
+            ) or file.is_dir():
+                continue
+            module_name = file.stem
+            module_path = file.as_posix()
+            spec = importlib.util.spec_from_file_location(module_name, module_path)
+            if spec is None or spec.loader is None:
+                continue
+            module = importlib.util.module_from_spec(spec)
+            try:
+                spec.loader.exec_module(module)
+            except Exception:  # noqa
+                continue
+
+    app.mount("/api/plugin", plugin_app)
+
+
+import_plugins()
 
 
 @app.get("/morph", response_model=None)
