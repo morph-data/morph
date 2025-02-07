@@ -1,4 +1,3 @@
-import configparser
 import json
 import os
 import sys
@@ -14,7 +13,6 @@ from tabulate import tabulate
 
 from morph.cli.flags import Flags
 from morph.config.project import MorphProject, load_project
-from morph.constants import MorphConstant
 from morph.task.base import BaseTask
 from morph.task.utils.logging import get_morph_logger
 from morph.task.utils.morph import find_project_root_dir
@@ -58,27 +56,6 @@ class RunTask(BaseTask):
         self.is_filepath = os.path.splitext(os.path.basename(filename_or_alias))[1]
         self.mode = mode
         self.api_key = ""
-
-        # validate credentials
-        config_path = MorphConstant.MORPH_CRED_PATH
-        has_config = os.path.exists(config_path)
-
-        if has_config:
-            # read credentials
-            config = configparser.ConfigParser()
-            config.read(config_path)
-            if not config.sections():
-                click.echo(
-                    click.style(
-                        f"Error: No credentials entries found in {config_path}.",
-                        fg="red",
-                        bg="yellow",
-                    )
-                )
-                sys.exit(1)  # 1: General errors
-
-            self.api_key = config.get("default", "api_key", fallback="")
-            os.environ["MORPH_API_KEY"] = self.api_key
 
         try:
             start_dir = filename_or_alias if os.path.isabs(filename_or_alias) else "./"

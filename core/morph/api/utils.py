@@ -32,7 +32,8 @@ def convert_file_output(
         limit = limit if limit is not None else len(df)
         skip = skip if skip is not None else 0
         df = df.iloc[skip : skip + limit]
-        return {"count": count, "items": df.to_dict(orient="records")}
+        df = df.replace({float("nan"): None, pd.NaT: None}).to_dict(orient="records")
+        return {"count": count, "items": df}
     elif type == "html" or type == "markdown":
         with open(output_path, "r") as f:
             return f.read()
