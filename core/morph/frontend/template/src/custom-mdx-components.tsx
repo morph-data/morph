@@ -19,6 +19,7 @@ import {
   SelectItems,
   DatePicker,
   DateRangePicker,
+  Pre,
 } from "@morph-data/components";
 import { MDXComponents } from "mdx/types";
 
@@ -43,4 +44,5 @@ export const customMDXComponents: MDXComponents = {
   Chat,
   DatePicker,
   DateRangePicker,
+  pre: Pre,
 };
