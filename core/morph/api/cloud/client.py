@@ -32,12 +32,24 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
 
         from morph.config.project import load_project  # avoid circular import
 
-        project = load_project(find_project_root_dir())
-        if project is None:
-            raise ValueError("No project found.")
-        profile = project.profile or "default"
+        try:
+            project_root = find_project_root_dir()
+        except Exception:  # noqa
+            project_root = None
 
-        self.project_id = os.environ.get("MORPH_PROJECT_ID", project.project_id or "")
+        if project_root:
+            project = load_project(project_root)
+        else:
+            project = None
+
+        if project:
+            profile = project.profile or "default"
+        else:
+            profile = "default"
+
+        self.project_id = os.environ.get(
+            "MORPH_PROJECT_ID", "" if not project else project.project_id or ""
+        )
 
         self.api_key = os.environ.get("MORPH_API_KEY", "")
         if not self.api_key:
