@@ -1,4 +1,3 @@
-import configparser
 import os
 import signal
 import socket
@@ -12,7 +11,6 @@ import click
 from dotenv import dotenv_values, load_dotenv
 
 from morph.cli.flags import Flags
-from morph.constants import MorphConstant
 from morph.task.base import BaseTask
 from morph.task.utils.morph import find_project_root_dir, initialize_frontend_dir
 from morph.task.utils.timezone import TimezoneManager
@@ -37,27 +35,6 @@ class ApiTask(BaseTask):
             self.workdir = os.getcwd()
 
         os.environ["MORPH_LOCAL_DEV_MODE"] = "true"
-
-        config_path = MorphConstant.MORPH_CRED_PATH
-        has_config = os.path.exists(config_path)
-
-        if has_config:
-            # read credentials
-            config = configparser.ConfigParser()
-            config.read(config_path)
-            if not config.sections():
-                click.echo(
-                    click.style(
-                        f"Error: No credentials entries found in {config_path}.",
-                        fg="red",
-                        bg="yellow",
-                    )
-                )
-                sys.exit(1)  # 1: General errors
-
-            # set api key
-            self.api_key: str = config.get("default", "api_key", fallback="")
-            os.environ["MORPH_API_KEY"] = self.api_key
 
         # load environment variables from .env file
         self.project_root = find_project_root_dir()
