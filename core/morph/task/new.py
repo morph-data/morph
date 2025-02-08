@@ -170,7 +170,7 @@ class NewTask(BaseTask):
                     )
                 else:
                     if morph_data_version:
-                        morph_data_dep = f"morph-data = {morph_data_version}"
+                        morph_data_dep = f'morph-data = "{morph_data_version}"'
                     else:
                         morph_data_dep = "morph-data"
 
