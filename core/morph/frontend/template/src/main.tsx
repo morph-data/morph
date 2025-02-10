@@ -1,6 +1,6 @@
 import "vite/modulepreload-polyfill";
 import { createRoot } from "react-dom/client";
-import { createInertiaApp } from "@inertiajs/react";
+import { createInertiaApp, Head } from "@inertiajs/react";
 import React, { StrictMode, useMemo } from "react";
 import { PageSkeleton } from "./page-skeleton.tsx";
 import "@morph-data/components/css";
@@ -85,21 +85,28 @@ document.addEventListener("DOMContentLoaded", () => {
           return null;
         }, []);
 
+        const title = pageModule?.title || firstHeading?.value || "Untitled";
+
         return (
-          <PageSkeleton
-            routes={routes}
-            title={pageModule?.title || firstHeading?.value || "Untitled"}
-            showAdminPage={showAdminPage}
-            toc={pageModule?.tableOfContents}
-          >
-            {name === "morph" ? (
-              <AdminPage />
-            ) : pageModule ? (
-              <pageModule.default components={customMDXComponents} />
-            ) : (
-              <ErrorPage routes={routes} />
-            )}
-          </PageSkeleton>
+          <>
+            <Head title={title}>
+              <link head-key="favicon" rel="icon" href="/public/favicon.ico" />
+            </Head>
+            <PageSkeleton
+              routes={routes}
+              title={title}
+              showAdminPage={showAdminPage}
+              toc={pageModule?.tableOfContents}
+            >
+              {name === "morph" ? (
+                <AdminPage />
+              ) : pageModule ? (
+                <pageModule.default components={customMDXComponents} />
+              ) : (
+                <ErrorPage routes={routes} />
+              )}
+            </PageSkeleton>
+          </>
         );
       };
 

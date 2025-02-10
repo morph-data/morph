@@ -17,11 +17,10 @@ from inertia import (
     inertia_version_conflict_exception_handler,
 )
 from mangum import Mangum
-from starlette.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-
 from morph.api.error import ApiBaseError, InternalError
 from morph.api.handler import router
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 # configuration values
 
@@ -86,6 +85,12 @@ else:
         StaticFiles(directory=os.path.join(frontend_dir, "dist", "assets")),
         name="assets",
     )
+
+app.mount(
+    "/public",
+    StaticFiles(directory=os.path.join(os.getcwd(), "public"), check_dir=False),
+)
+
 
 app.add_middleware(
     CORSMiddleware,

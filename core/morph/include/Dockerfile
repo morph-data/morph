@@ -15,6 +15,7 @@ COPY .morph/meta.json .morph/
 COPY morph_project.yml .
 COPY data ./data
 COPY src ./src
+COPY public ./public
 
 # Command to run the Lambda function
 CMD ["core.morph.api.app.handler"]
