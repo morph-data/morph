@@ -332,10 +332,6 @@ class MorphGlobalContext:
         if len(self.__scans) == 0:
             raise ValueError("No files are loaded.")
 
-        import pdb
-
-        pdb.set_trace()
-
         scan = self.__scans[-1]
         cache_items: list[MorphFunctionMetaObjectCacheItem] = []
         for scan_item in scan.items:
