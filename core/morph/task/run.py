@@ -132,7 +132,15 @@ class RunTask(BaseTask):
             resource = context.search_meta_object_by_name(filename_or_alias)
             if resource is not None:
                 # id is formatted as {filename}:{function_name}
-                self.filename = str(resource.id).split(":")[0]
+                if sys.platform == "win32":
+                    if len(resource.id.split(":")) > 2:
+                        self.filename = (
+                            resource.id.rsplit(":", 1)[0] if resource.id else ""
+                        )
+                    else:
+                        self.filename = resource.id if resource.id else ""
+                else:
+                    self.filename = str(resource.id).split(":")[0]
 
         if resource is None:
             if self.mode == "api":
@@ -196,7 +204,15 @@ class RunTask(BaseTask):
 
             cell = self.resource.name
             # id is formatted as {filename}:{function_name}
-            filepath = self.resource.id.split(":")[0]
+            if sys.platform == "win32":
+                if len(self.resource.id.split(":")) > 2:
+                    filepath = (
+                        self.resource.id.rsplit(":", 1)[0] if self.resource.id else ""
+                    )
+                else:
+                    filepath = self.resource.id if self.resource.id else ""
+            else:
+                filepath = self.resource.id.split(":")[0]
             self.logger.info(
                 f"Running {self.ext[1:]} file: {filepath}, variables: {self.vars}"
             )
