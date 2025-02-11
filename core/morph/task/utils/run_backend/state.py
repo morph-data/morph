@@ -332,12 +332,22 @@ class MorphGlobalContext:
         if len(self.__scans) == 0:
             raise ValueError("No files are loaded.")
 
+        import pdb
+
+        pdb.set_trace()
+
         scan = self.__scans[-1]
         cache_items: list[MorphFunctionMetaObjectCacheItem] = []
         for scan_item in scan.items:
             for obj in self.__meta_objects:
                 # id is formatted as {filename}:{function_name}
-                obj_filepath = obj.id.split(":")[0] if obj.id else ""
+                if sys.platform == "win32":
+                    if len(obj.id.split(":")) > 2:
+                        obj_filepath = obj.id.rsplit(":", 1)[0] if obj.id else ""
+                    else:
+                        obj_filepath = obj.id if obj.id else ""
+                else:
+                    obj_filepath = obj.id.split(":")[0] if obj.id else ""
                 if scan_item.file_path == obj_filepath:
                     cache_obj = copy.deepcopy(obj)
                     if cache_obj.function:

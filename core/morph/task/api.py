@@ -121,7 +121,13 @@ class ApiTask(BaseTask):
                     fg="yellow",
                 )
             )
-            signal.pause()
+            if hasattr(signal, "pause"):
+                signal.pause()
+            else:
+                import time
+
+                while True:
+                    time.sleep(1)
         except KeyboardInterrupt:
             self._signal_handler(None, None)
 
@@ -151,13 +157,24 @@ class ApiTask(BaseTask):
         cwd: Optional[str] = None,
         is_debug: Optional[bool] = True,
     ) -> None:
-        process = subprocess.Popen(
-            command,
-            cwd=cwd,
-            stdout=subprocess.PIPE if is_debug else subprocess.DEVNULL,
-            stderr=subprocess.PIPE if is_debug else subprocess.DEVNULL,
-            text=True,
-        )
+        if sys.platform == "win32":
+            process = subprocess.Popen(
+                ["cmd.exe", "/c"] + command,
+                cwd=cwd,
+                stdout=subprocess.PIPE if is_debug else subprocess.DEVNULL,
+                stderr=subprocess.PIPE if is_debug else subprocess.DEVNULL,
+                text=True,
+            )
+        else:
+            process = subprocess.Popen(
+                command,
+                cwd=cwd,
+                stdout=subprocess.PIPE if is_debug else subprocess.DEVNULL,
+                stderr=subprocess.PIPE if is_debug else subprocess.DEVNULL,
+                text=True,
+            )
+        a = ""
+        a.startswith
 
         def log_output(pipe):
             for line in iter(pipe.readline, ""):
