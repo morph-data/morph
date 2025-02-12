@@ -6,10 +6,10 @@ import { PageSkeleton } from "./page-skeleton.tsx";
 import "@morph-data/components/css";
 import { MDXComponents } from "mdx/types";
 import type { Toc } from "@stefanprobst/rehype-extract-toc";
-import { customMDXComponents } from "./custom-mdx-components.tsx";
 import { AdminPage } from "./admin/AdminPage.tsx";
 import { ErrorPage } from "./error-page.tsx";
 import { useRefresh } from "@morph-data/components";
+import { mdxComponents } from "./mdx-componens.tsx";
 
 type MDXProps = {
   children?: React.ReactNode;
@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
             {name === "morph" ? (
               <AdminPage />
             ) : pageModule ? (
-              <pageModule.default components={customMDXComponents} />
+              <pageModule.default components={mdxComponents} />
             ) : (
               <ErrorPage routes={routes} />
             )}
