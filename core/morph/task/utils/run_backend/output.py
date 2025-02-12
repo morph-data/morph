@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import os
+import sys
 import threading
 import traceback
 from typing import Any, Dict, Generator, List, Literal, Optional, Union, cast
@@ -197,7 +198,15 @@ def stream_and_write_and_response(
                 if err:
                     raise Exception(err)
                 else:
-                    filepath = resource.id.split(":")[0]
+                    if sys.platform == "win32":
+                        if len(resource.id.split(":")) > 2:
+                            filepath = (
+                                resource.id.rsplit(":", 1)[0] if resource.id else ""
+                            )
+                        else:
+                            filepath = resource.id if resource.id else ""
+                    else:
+                        filepath = resource.id.split(":")[0]
                     logger.info(f"Successfully ran file 🎉: {filepath}")
 
         import asyncio
@@ -238,7 +247,13 @@ def stream_and_write_and_response(
             if err:
                 raise Exception(err)
             else:
-                filepath = resource.id.split(":")[0]
+                if sys.platform == "win32":
+                    if len(resource.id.split(":")) > 2:
+                        filepath = resource.id.rsplit(":", 1)[0] if resource.id else ""
+                    else:
+                        filepath = resource.id if resource.id else ""
+                else:
+                    filepath = resource.id.split(":")[0]
                 logger.info(f"Successfully ran file 🎉: {filepath}")
 
 
@@ -439,9 +454,16 @@ def _save_output_to_file(
             else:
                 output_paths = [os.path.splitext(output_paths[0])[0] + ".stream.json"]
 
+    if sys.platform == "win32":
+        if len(resource.id.split(":")) > 2:
+            path = resource.id.rsplit(":", 1)[0] if resource.id else ""
+        else:
+            path = resource.id if resource.id else ""
+    else:
+        path = resource.id.split(":")[0] if resource.id else ""
     resource_ = Resource(
         alias=resource.name if resource.name else "",
-        path=resource.id.split(":")[0] if resource.id else "",
+        path=path,
         connection=resource.connection,
         output_paths=output_paths,
         output_type=output_type,

@@ -7,6 +7,7 @@ import tempfile
 import time
 import uuid
 from contextlib import redirect_stdout
+from pathlib import Path
 from typing import Any
 
 import click
@@ -28,7 +29,6 @@ from morph.api.utils import (
     set_command_args,
 )
 from morph.cli.flags import Flags
-from morph.config.project import default_output_paths
 from morph.task.resource import PrintResourceTask
 from morph.task.run import RunTask
 from morph.task.utils.morph import find_project_root_dir
@@ -324,9 +324,11 @@ async def file_upload_service(input: UploadFileService) -> Any:
             )
         )
 
-        # Retrieve the result of the file_upload function
-        output_file = default_output_paths()[0]
-        with open(output_file, "r") as f:
+        # Read the saved file path from the cache (always created as following path)
+        cache_file = Path(find_project_root_dir()).joinpath(
+            ".morph/cache/file_upload.md"
+        )
+        with open(cache_file, "r") as f:
             saved_filepath = f.read()
 
         # Remove the temporary directory

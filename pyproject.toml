@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "morph-data"
-version = "0.1.4"
+version = "0.1.5"
 description = "Morph is a python-centric full-stack framework for building and deploying data apps."
 authors = ["Morph <contact@morphdb.io>"]
 packages = [
@@ -79,15 +79,12 @@ pyarrow = "^17.0.0"
 sqlglot = "^25.22.0"
 colorama = "^0.4.6"
 gitpython = "^3.1.43"
-openai = "^1.14.2"
 fastapi = "^0.115.4"
 uvicorn = "^0.32.0"
 typing-extensions = "^4.12.2"
 gitignore-parser = "^0.1.11"
 python-multipart = "^0.0.17"
 psutil = "^6.1.0"
-anthropic = "^0.39.0"
-groq = "^0.12.0"
 fastapi-inertia = "^1.0.3"
 itsdangerous = "^2.2.0"
 starlette = "^0.41.3"
