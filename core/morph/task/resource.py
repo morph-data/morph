@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any, List, Literal, cast
 
@@ -107,7 +108,16 @@ class PrintResourceTask(BaseTask):
                 # id is formatted as {filename}:{function_name}
                 if not item.spec.id or not item.spec.name:
                     continue
-                filepath = item.spec.id.split(":")[0]
+
+                if sys.platform == "win32":
+                    if len(item.spec.id.split(":")) > 2:
+                        filepath = (
+                            item.spec.id.rsplit(":", 1)[0] if item.spec.id else ""
+                        )
+                    else:
+                        filepath = item.spec.id if item.spec.id else ""
+                else:
+                    filepath = item.spec.id.split(":")[0]
                 resource_item = Resource(
                     alias=item.spec.name,
                     path=filepath,

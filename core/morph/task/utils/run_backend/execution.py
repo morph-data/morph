@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import os
+import sys
 from typing import Any, Callable, List, Optional, Union
 
 import pandas as pd
@@ -506,7 +507,13 @@ def _run_cell_with_dag(
         raise ValueError("No DAG settings provided.")
 
     logger = get_morph_logger()
-    filepath = cell.id.split(":")[0]
+    if sys.platform == "win32":
+        if len(cell.id.split(":")) > 2:
+            filepath = cell.id.rsplit(":", 1)[0] if cell.id else ""
+        else:
+            filepath = cell.id if cell.id else ""
+    else:
+        filepath = cell.id.split(":")[0]
     ext = os.path.splitext(os.path.basename(filepath))[1]
 
     try:
