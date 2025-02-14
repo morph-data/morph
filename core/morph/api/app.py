@@ -17,11 +17,10 @@ from inertia import (
     inertia_version_conflict_exception_handler,
 )
 from mangum import Mangum
-from starlette.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-
 from morph.api.error import ApiBaseError, InternalError
 from morph.api.handler import router
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 # configuration values
 
@@ -87,6 +86,12 @@ else:
         name="assets",
     )
 
+app.mount(
+    "/static",
+    StaticFiles(directory=os.path.join(os.getcwd(), "static"), check_dir=False),
+)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -142,7 +147,6 @@ app.include_router(router)
 
 @app.get("/morph", response_model=None)
 async def morph(inertia: InertiaDep) -> InertiaResponse:
-
     if is_local_dev_mode:
         return await inertia.render("morph", {"showAdminPage": True})
 
