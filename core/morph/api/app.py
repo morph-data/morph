@@ -87,8 +87,8 @@ else:
     )
 
 app.mount(
-    "/public",
-    StaticFiles(directory=os.path.join(os.getcwd(), "public"), check_dir=False),
+    "/static",
+    StaticFiles(directory=os.path.join(os.getcwd(), "static"), check_dir=False),
 )
 
 
@@ -147,7 +147,6 @@ app.include_router(router)
 
 @app.get("/morph", response_model=None)
 async def morph(inertia: InertiaDep) -> InertiaResponse:
-
     if is_local_dev_mode:
         return await inertia.render("morph", {"showAdminPage": True})
 

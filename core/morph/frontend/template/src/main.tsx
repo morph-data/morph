@@ -90,7 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return (
           <>
             <Head title={title}>
-              <link head-key="favicon" rel="icon" href="/public/favicon.ico" />
+              <link head-key="favicon" rel="icon" href="/static/favicon.ico" />
             </Head>
             <PageSkeleton
               routes={routes}
