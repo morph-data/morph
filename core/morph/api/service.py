@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import os
+import sys
 import tempfile
 import time
 import uuid
@@ -268,11 +269,14 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
                 if first_chunk:
                     first_chunk = False
                     yield '{"chunks": ['
+                    sys.stdout.flush()
                     await asyncio.sleep(0.02)
                 yield c + ","
+                sys.stdout.flush()
                 await asyncio.sleep(0.02)
 
             yield "]}"
+            sys.stdout.flush()
         except Exception as e:
             error_detail = {
                 "type": type(e).__name__,
