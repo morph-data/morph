@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from typing import Annotated
 
+import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -16,11 +17,11 @@ from inertia import (
     inertia_request_validation_exception_handler,
     inertia_version_conflict_exception_handler,
 )
-from mangum import Mangum
-from morph.api.error import ApiBaseError, InternalError
-from morph.api.handler import router
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+
+from morph.api.error import ApiBaseError, InternalError
+from morph.api.handler import router
 
 # configuration values
 
@@ -158,4 +159,10 @@ async def subpages(full_path: str, inertia: InertiaDep) -> InertiaResponse:
     return await inertia.render(full_path, {"showAdminPage": is_local_dev_mode})
 
 
-handler = Mangum(app)
+if __name__ == "__main__":
+    uvicorn.run(
+        "morph.api.app:app",
+        host="0.0.0.0",
+        port=8080,
+        reload=True,
+    )
