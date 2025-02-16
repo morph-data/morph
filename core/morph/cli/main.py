@@ -184,24 +184,6 @@ def serve(
     return None, True
 
 
-@cli.command("start")
-@params.workdir
-@click.pass_context
-@global_flags
-@requires.preflight
-@requires.postflight
-def start(
-    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
-) -> Tuple[None, bool]:
-    """Launch API server."""
-    from morph.task.start import StartTask
-
-    task = StartTask(ctx.obj["flags"])
-    task.run()
-
-    return None, True
-
-
 @cli.command("init")
 @click.pass_context
 @global_flags
