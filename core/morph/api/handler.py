@@ -81,7 +81,7 @@ async def vm_run_file_stream(
         if first_chunk:
             yield first_chunk
         async for chunk in generator:
-            yield chunk
+            yield f"data: {chunk}\n\n"
 
     return StreamingResponse(
         content=_generate_content(),
