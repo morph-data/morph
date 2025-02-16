@@ -161,8 +161,8 @@ async def subpages(full_path: str, inertia: InertiaDep) -> InertiaResponse:
 
 if __name__ == "__main__":
     uvicorn.run(
-        "morph.api.app:app",
+        app,
         host="0.0.0.0",
         port=8080,
-        reload=True,
+        reload=False,
     )
