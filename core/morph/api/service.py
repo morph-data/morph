@@ -14,8 +14,7 @@ import click
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
-from morph.api.error import ErrorCode, ErrorMessage, RequestError, WarningError
-from morph.api.types import (
+from morph.api.custom_types import (
     RunFileService,
     RunFileStreamService,
     RunFileWithTypeResponse,
@@ -23,6 +22,7 @@ from morph.api.types import (
     SuccessResponse,
     UploadFileService,
 )
+from morph.api.error import ErrorCode, ErrorMessage, RequestError, WarningError
 from morph.api.utils import (
     convert_file_output,
     convert_variables_values,
