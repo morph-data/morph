@@ -77,12 +77,14 @@ Python: Using Plotly to create a chart.
 import plotly.express as px
 import morph
 from morph import MorphGlobalContext
+from morph_lib.types import HtmlResponse
+
 @morph.func
 @morph.load_data("example_data")
 def example_chart(context: MorphGlobalContext):
     df = context.data["example_data"].groupby("state").sum(["population"]).reset_index()
     fig = px.bar(df, x="state", y="population")
-    return fig
+    return HtmlResponse(fig.to_html())
 ```
 
 MDX: Define the page and connect the data.

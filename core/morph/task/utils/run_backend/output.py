@@ -14,12 +14,7 @@ import pandas as pd
 import plotly.graph_objects
 import plotly.io as pio
 import pyarrow
-from morph_lib.types import (
-    HtmlImageResponse,
-    HtmlResponse,
-    MarkdownResponse,
-    MorphChatStreamChunk,
-)
+from morph_lib.types import HtmlResponse, MarkdownResponse, MorphChatStreamChunk
 from pydantic import BaseModel
 
 from morph.config.project import MorphProject, default_output_paths
@@ -346,12 +341,10 @@ def convert_run_result(output: Any) -> Any:
         return pd.DataFrame.from_dict(output, orient="index").T
     elif _is_matplotlib_figure(output):
         html = _get_html_from_mpl_image(output, "html")
-        image = _get_html_from_mpl_image(output, "png")
-        return HtmlImageResponse(html=html, image=image)
+        return HtmlResponse(html)
     elif isinstance(output, plotly.graph_objects.Figure):
         html = _get_html_from_plotly_image(output, "html")
-        image = _get_html_from_plotly_image(output, "png")
-        return HtmlImageResponse(html=html, image=image)
+        return HtmlResponse(html)
 
     return output
 
@@ -374,8 +367,6 @@ def _infer_output_type(output: Any) -> Optional[str]:
     elif isinstance(output, list):
         return "visualization"
     elif isinstance(output, HtmlResponse):
-        return "visualization"
-    elif isinstance(output, HtmlImageResponse):
         return "visualization"
     elif isinstance(output, MarkdownResponse):
         return "markdown"
@@ -475,8 +466,6 @@ def _save_output_to_file(
         output = output.value
     elif isinstance(output, MarkdownResponse):
         output = output.value
-    elif isinstance(output, HtmlImageResponse):
-        output = [output.html, output.image]
 
     resource_ = resource_.save_output_to_file(run_id, output, logger)
     return resource_.output_paths
