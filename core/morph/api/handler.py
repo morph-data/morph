@@ -94,7 +94,7 @@ async def vm_run_file_stream(
 @router.post("/cli/run/{name}/{type}")
 def run_file_with_type(
     name: str,
-    type: Literal["json", "html", "image", "markdown"],
+    type: Literal["json", "html", "markdown"],
     body: RunFileWithTypeRequestBody,
     limit: Optional[int] = None,
     skip: Optional[int] = None,

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
-import io
 import json
 import logging
 import os
@@ -573,15 +571,3 @@ def generate_variables_hash(vars: Optional[dict[str, Any]]) -> Optional[str]:
     sha256 = hashlib.sha256()
     sha256.update(str(sorted_items).encode("utf-8"))
     return sha256.hexdigest()
-
-
-def convert_image_base64(filepath: str) -> str:
-    from PIL import Image
-
-    with open(filepath, "rb") as f:
-        image = Image.open(f)
-        image.load()
-    buffered = io.BytesIO()
-    image.save(buffered, format=image.format)
-    img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    return img_base64
