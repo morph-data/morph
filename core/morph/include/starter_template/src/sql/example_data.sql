@@ -11,6 +11,6 @@ select
     Traffic as traffic,
     Orders as orders
 from
-    read_csv_auto("./data/Traffic_Orders_Demo_Data.csv", strict_mode=false)
+    read_csv_auto("./data/Traffic_Orders_Demo_Data.csv")
 where
     Date >= '2023-01-01'
