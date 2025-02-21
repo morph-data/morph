@@ -55,7 +55,7 @@ Understanding the concept of developing an AI app in Morph will let you do a fly
 
 1. Create each files in `python` and `pages` directories.
 
-Python: Using Plotly to create a chart.
+Python: Using Plotly to create a AI Pipeline.
 
 ```python
 import morph
