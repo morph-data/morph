@@ -24,7 +24,7 @@ class RunFileWithTypeRequestBody(BaseModel):
 
 class RunFileWithTypeService(BaseModel):
     name: str
-    type: Literal["json", "html", "image", "markdown"]
+    type: Literal["json", "html", "markdown"]
     variables: Optional[Dict[str, Any]] = None
     use_cache: Optional[bool] = True
     limit: Optional[int] = None

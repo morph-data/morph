@@ -1,5 +1,4 @@
 import os
-import pty
 import re
 import select
 import shutil
@@ -333,8 +332,18 @@ class DeployTask(BaseTask):
         click.echo(click.style("Building frontend...", fg="blue"))
         try:
             # Run npm install and build
-            subprocess.run(["npm", "install"], cwd=self.project_root, check=True)
-            subprocess.run(["npm", "run", "build"], cwd=self.project_root, check=True)
+            subprocess.run(
+                ["npm", "install"],
+                cwd=self.project_root,
+                check=True,
+                shell=True if sys.platform == "win32" else False,
+            )
+            subprocess.run(
+                ["npm", "run", "build"],
+                cwd=self.project_root,
+                check=True,
+                shell=True if sys.platform == "win32" else False,
+            )
 
         except subprocess.CalledProcessError as e:
             click.echo(click.style(f"Error building frontend: {str(e)}", fg="red"))
@@ -367,122 +376,173 @@ class DeployTask(BaseTask):
 
     def _build_docker_image(self) -> str:
         """
-        Builds the Docker image using a pseudo-terminal (PTY) to preserve colored output.
-        Captures logs in plain text format (with ANSI codes removed) for cloud storage while
-        adding color to local terminal output for better readability.
+        Builds the Docker image using a pseudo-terminal (PTY) to preserve colored output on Unix-like systems.
+        On Windows, termios/pty is not available, so we fall back to a simpler subprocess approach.
         """
-        try:
-            docker_build_cmd = [
-                "docker",
-                "build",
-                "--progress=plain",
-                # Simplifies logs by avoiding line overwrites in cloud logs; removes colors and animations
-                "-t",
-                self.image_name,
-                "-f",
-                self.dockerfile,
-                self.project_root,
-            ]
-            if self.no_cache:
-                docker_build_cmd.append("--no-cache")
+        docker_build_cmd = [
+            "docker",
+            "build",
+            "--progress=plain",
+            "-t",
+            self.image_name,
+            "-f",
+            self.dockerfile,
+            self.project_root,
+        ]
+        if self.no_cache:
+            docker_build_cmd.append("--no-cache")
 
-            # Regex to strip ANSI escape sequences for storing logs as plain text
-            ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+        # Regex to strip ANSI escape sequences for storing logs as plain text
+        ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
-            # Create a pseudo-terminal pair
-            master_fd, slave_fd = pty.openpty()
-
-            # Spawn the Docker build process with PTY
-            process = subprocess.Popen(
-                docker_build_cmd,
-                stdin=slave_fd,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                text=False,  # Receive raw binary data (not decoded text)
-                bufsize=0,  # No extra buffering
+        if sys.platform == "win32":
+            click.echo(
+                click.style("Detected Windows: skipping PTY usage.", fg="yellow")
             )
+            try:
+                process = subprocess.Popen(
+                    docker_build_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
 
-            # The slave FD is not needed after starting the process
-            os.close(slave_fd)
+                build_logs = []
 
-            build_logs = []
-
-            while True:
-                # Use select to check if there's data to read from the master FD
-                r, _, _ = select.select([master_fd], [], [], 0.1)
-                if master_fd in r:
-                    # Read up to 1KB from the master FD
-                    try:
-                        chunk = os.read(master_fd, 1024)
-                    except OSError:
-                        # If reading fails, exit the loop
+                while True:
+                    line = process.stdout.readline()
+                    if not line and process.poll() is not None:
                         break
+                    if line:
+                        clean_text = ansi_escape.sub("", line)
+                        build_logs.append(clean_text)
+                        # ローカル表示用にカラーをつけて出力
+                        colored_chunk = click.style(clean_text, fg="blue")
+                        sys.stdout.write(colored_chunk)
+                        sys.stdout.flush()
 
-                    if not chunk:
-                        # EOF
-                        break
-
-                    # Remove ANSI codes and store logs for cloud storage
-                    text_chunk = chunk.decode(errors="replace")
-                    clean_text = ansi_escape.sub("", text_chunk)
+                err_text = process.stderr.read()
+                if err_text:
+                    clean_text = ansi_escape.sub("", err_text)
                     build_logs.append(clean_text)
-
-                    # Add color to logs for local terminal
                     colored_chunk = click.style(clean_text, fg="blue")
                     sys.stdout.write(colored_chunk)
                     sys.stdout.flush()
 
-                # If the process has exited, read any remaining data
-                if process.poll() is not None:
-                    # Read everything left until EOF
-                    while True:
+                return_code = process.wait()
+                if return_code != 0:
+                    all_logs = "".join(build_logs)
+                    raise subprocess.CalledProcessError(
+                        return_code, docker_build_cmd, output=all_logs
+                    )
+
+                click.echo(
+                    click.style(
+                        f"Docker image '{self.image_name}' built successfully.",
+                        fg="green",
+                    )
+                )
+                return "".join(build_logs)
+
+            except subprocess.CalledProcessError as e:
+                click.echo(
+                    click.style(
+                        f"Error building Docker image '{self.image_name}': {e.output}",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+            except Exception as e:
+                click.echo(
+                    click.style(
+                        f"Unexpected error while building Docker image: {str(e)}",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+
+        else:
+            try:
+                import pty
+
+                master_fd, slave_fd = pty.openpty()
+
+                process = subprocess.Popen(
+                    docker_build_cmd,
+                    stdin=slave_fd,
+                    stdout=slave_fd,
+                    stderr=slave_fd,
+                    text=False,
+                    bufsize=0,
+                )
+
+                os.close(slave_fd)
+
+                build_logs = []
+
+                while True:
+                    r, _, _ = select.select([master_fd], [], [], 0.1)
+                    if master_fd in r:
                         try:
                             chunk = os.read(master_fd, 1024)
-                            if not chunk:
-                                break
-                            text_chunk = chunk.decode(errors="replace")
-                            clean_text = ansi_escape.sub("", text_chunk)
-                            build_logs.append(clean_text)
-                            colored_chunk = click.style(clean_text, fg="blue")
-                            sys.stdout.write(colored_chunk)
-                            sys.stdout.flush()
                         except OSError:
                             break
-                    break
+                        if not chunk:
+                            break
+                        text_chunk = chunk.decode(errors="replace")
+                        clean_text = ansi_escape.sub("", text_chunk)
+                        build_logs.append(clean_text)
+                        colored_chunk = click.style(clean_text, fg="blue")
+                        sys.stdout.write(colored_chunk)
+                        sys.stdout.flush()
 
-            # Close the master FD
-            os.close(master_fd)
+                    if process.poll() is not None:
+                        while True:
+                            try:
+                                chunk = os.read(master_fd, 1024)
+                                if not chunk:
+                                    break
+                                text_chunk = chunk.decode(errors="replace")
+                                clean_text = ansi_escape.sub("", text_chunk)
+                                build_logs.append(clean_text)
+                                colored_chunk = click.style(clean_text, fg="blue")
+                                sys.stdout.write(colored_chunk)
+                                sys.stdout.flush()
+                            except OSError:
+                                break
+                        break
 
-            return_code = process.wait()
-            if return_code != 0:
-                # If Docker build failed, show the full logs and raise an error
-                all_logs = "".join(build_logs)
-                raise subprocess.CalledProcessError(
-                    return_code, docker_build_cmd, output=all_logs
-                )
+                os.close(master_fd)
+                return_code = process.wait()
+                if return_code != 0:
+                    all_logs = "".join(build_logs)
+                    raise subprocess.CalledProcessError(
+                        return_code, docker_build_cmd, output=all_logs
+                    )
 
-            click.echo(
-                click.style(
-                    f"Docker image '{self.image_name}' built successfully.", fg="green"
+                click.echo(
+                    click.style(
+                        f"Docker image '{self.image_name}' built successfully.",
+                        fg="green",
+                    )
                 )
-            )
-            # Return the captured logs as plain text
-            return "".join(build_logs)
+                return "".join(build_logs)
 
-        except subprocess.CalledProcessError:
-            click.echo(
-                click.style(
-                    f"Error building Docker image '{self.image_name}'.", fg="red"
+            except subprocess.CalledProcessError:
+                click.echo(
+                    click.style(
+                        f"Error building Docker image '{self.image_name}'.", fg="red"
+                    )
                 )
-            )
-            sys.exit(1)
-        except Exception as e:
-            click.echo(
-                click.style(
-                    f"Unexpected error while building Docker image: {str(e)}", fg="red"
+                sys.exit(1)
+            except Exception as e:
+                click.echo(
+                    click.style(
+                        f"Unexpected error while building Docker image: {str(e)}",
+                        fg="red",
+                    )
                 )
-            )
-            sys.exit(1)
+                sys.exit(1)
 
     def _save_docker_image(self):
         """
