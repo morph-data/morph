@@ -53,5 +53,5 @@ repos:
     hooks:
       - id: mypy
         types: [ python ]
-        exclude: ^.*example.*$
+        exclude: ^.*\b(example|core/morph/include)\b.*$
         additional_dependencies: [ pandas-stubs, types-requests, types-PyYAML, pydantic, types-tabulate ]
