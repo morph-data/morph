@@ -7,7 +7,7 @@
 - **Fast to start** 🚀 - Allows you to get up and running with just three commands.
 - **Deploy and operate 🌐** - Easily deploy your AI apps and manage them in production. Managed cloud is available for user authentication and secure data connection.
 - **No HTML/CSS knowledge required🔰** - With **Markdown-based syntax** and **pre-made components**, you can create flexible, visually appealing designs without writing a single line of HTML or CSS.
-- **Customizable 🛠️** - **Chain Python and SQL** for advanced data workflows. Custom CSS and custom React components are available for building tailored UI.
+- **Customizable 🛠️** - **Chain Python and SQL** for advanced AI workflows. Custom CSS and custom React components are available for building tailored UI.
 
 ## Quick start
 
@@ -80,7 +80,7 @@ MDX: Define the page and connect the data.
 
 2. Run `morph serve` to open the app!
 
-![AI App](https://data.morphdb.io/assets/sample-ai-app.png)
+![AI App](https://data.morphdb.io/assets/gif/langchain-demo.gif)
 
 ## Documentation
 
