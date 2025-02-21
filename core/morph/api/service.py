@@ -116,20 +116,12 @@ def run_file_with_type_service(
     execution_cache.update_cache(input.name, output_paths)
 
     output_path = output_paths[0]
-    if input.type == "image" or input.type == "html":
+    if input.type == "html":
         if len(output_paths) == 2:
-            if input.type == "image" and output_path.endswith(".html"):
-                output_path = output_paths[1]
-            elif input.type == "html" and not output_path.endswith(".html"):
+            if input.type == "html" and not output_path.endswith(".html"):
                 output_path = output_paths[1]
         elif len(output_paths) == 1:
-            if input.type == "image" and output_path.endswith(".html"):
-                raise WarningError(
-                    ErrorCode.ExecutionError,
-                    ErrorMessage.ExecutionErrorMessage["executionFailed"],
-                    "image not found",
-                )
-            elif (
+            if (
                 input.type == "html"
                 and not output_path.endswith(".html")
                 and not output_path.endswith(".txt")
