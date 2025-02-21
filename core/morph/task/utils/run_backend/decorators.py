@@ -30,9 +30,6 @@ def func(
     name: str | None = None,
     description: str | None = None,
     title: str | None = None,
-    output_type: Optional[
-        Literal["dataframe", "csv", "visualization", "markdown", "json"]
-    ] = None,
     result_cache_ttl: Optional[int] = None,
     alias: str | None = None,
     **kwargs: dict[str, Any],
@@ -64,7 +61,7 @@ def func(
             variables=variables,
             data_requirements=data_requirements,
             output_paths=default_output_paths(),
-            output_type=output_type,
+            output_type=None,
             connection=connection,
             result_cache_ttl=result_cache_ttl,
         )
