@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from typing import Annotated
 
+import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -16,7 +17,6 @@ from inertia import (
     inertia_request_validation_exception_handler,
     inertia_version_conflict_exception_handler,
 )
-from mangum import Mangum
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -87,6 +87,12 @@ else:
         name="assets",
     )
 
+app.mount(
+    "/static",
+    StaticFiles(directory=os.path.join(os.getcwd(), "static"), check_dir=False),
+)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -142,7 +148,6 @@ app.include_router(router)
 
 @app.get("/morph", response_model=None)
 async def morph(inertia: InertiaDep) -> InertiaResponse:
-
     if is_local_dev_mode:
         return await inertia.render("morph", {"showAdminPage": True})
 
@@ -154,4 +159,10 @@ async def subpages(full_path: str, inertia: InertiaDep) -> InertiaResponse:
     return await inertia.render(full_path, {"showAdminPage": is_local_dev_mode})
 
 
-handler = Mangum(app)
+if __name__ == "__main__":
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8080,
+        reload=False,
+    )

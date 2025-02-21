@@ -14,8 +14,7 @@ import click
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
-from morph.api.error import ErrorCode, ErrorMessage, RequestError, WarningError
-from morph.api.types import (
+from morph.api.custom_types import (
     RunFileService,
     RunFileStreamService,
     RunFileWithTypeResponse,
@@ -23,6 +22,7 @@ from morph.api.types import (
     SuccessResponse,
     UploadFileService,
 )
+from morph.api.error import ErrorCode, ErrorMessage, RequestError, WarningError
 from morph.api.utils import (
     convert_file_output,
     convert_variables_values,
@@ -116,20 +116,12 @@ def run_file_with_type_service(
     execution_cache.update_cache(input.name, output_paths)
 
     output_path = output_paths[0]
-    if input.type == "image" or input.type == "html":
+    if input.type == "html":
         if len(output_paths) == 2:
-            if input.type == "image" and output_path.endswith(".html"):
-                output_path = output_paths[1]
-            elif input.type == "html" and not output_path.endswith(".html"):
+            if input.type == "html" and not output_path.endswith(".html"):
                 output_path = output_paths[1]
         elif len(output_paths) == 1:
-            if input.type == "image" and output_path.endswith(".html"):
-                raise WarningError(
-                    ErrorCode.ExecutionError,
-                    ErrorMessage.ExecutionErrorMessage["executionFailed"],
-                    "image not found",
-                )
-            elif (
+            if (
                 input.type == "html"
                 and not output_path.endswith(".html")
                 and not output_path.endswith(".txt")
