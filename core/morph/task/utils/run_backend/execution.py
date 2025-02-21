@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
-import io
 import json
 import logging
 import os
@@ -13,7 +11,7 @@ from typing import Any, Callable, List, Optional, Union
 import pandas as pd
 from jinja2 import BaseLoader, Environment
 from morph_lib.error import RequestError
-from morph_lib.types import HtmlImageResponse, MarkdownResponse, MorphChatStreamChunk
+from morph_lib.types import HtmlResponse, MarkdownResponse, MorphChatStreamChunk
 from pydantic import BaseModel
 
 from morph.config.project import MorphProject, default_output_paths
@@ -226,11 +224,7 @@ def run_cell(
                     )
                 elif ext_ == "html":
                     cached_result = RunCellResult(
-                        result=HtmlImageResponse(html=open(path, "r").read())
-                    )
-                elif ext_ == "png":
-                    cached_result = RunCellResult(
-                        result=HtmlImageResponse(image=convert_image_base64(path))
+                        result=HtmlResponse(open(path, "r").read())
                     )
                 if cached_result:
                     return cached_result
@@ -245,23 +239,12 @@ def run_cell(
         cache_outputs = default_output_paths()
         if len(cache_outputs) > 1:
             html_path = next((x for x in cache_outputs if x.endswith(".html")), None)
-            image_path = next((x for x in cache_outputs if x.endswith(".png")), None)
-            if (
-                html_path
-                and image_path
-                and os.path.exists(html_path)
-                and os.path.exists(image_path)
-            ):
+            if html_path and os.path.exists(html_path):
                 if logger:
                     logger.info(
                         f"Running {meta_obj.name} using existing file-based cache (legacy)."
                     )
-                return RunCellResult(
-                    result=HtmlImageResponse(
-                        html=open(html_path, "r").read(),
-                        image=convert_image_base64(image_path),
-                    )
-                )
+                return RunCellResult(result=HtmlResponse(open(html_path, "r").read()))
         if len(cache_outputs) > 0:
             cache_path = cache_outputs[0]
             cache_path_ext = cache_path.split(".")[-1]
@@ -291,11 +274,7 @@ def run_cell(
                     )
                 elif cache_path_ext == "html":
                     cached_result = RunCellResult(
-                        result=HtmlImageResponse(html=open(cache_path, "r").read())
-                    )
-                elif cache_path_ext == "png":
-                    cached_result = RunCellResult(
-                        result=HtmlImageResponse(image=convert_image_base64(cache_path))
+                        result=HtmlResponse(open(cache_path, "r").read())
                     )
                 if cached_result:
                     if logger:
@@ -592,15 +571,3 @@ def generate_variables_hash(vars: Optional[dict[str, Any]]) -> Optional[str]:
     sha256 = hashlib.sha256()
     sha256.update(str(sorted_items).encode("utf-8"))
     return sha256.hexdigest()
-
-
-def convert_image_base64(filepath: str) -> str:
-    from PIL import Image
-
-    with open(filepath, "rb") as f:
-        image = Image.open(f)
-        image.load()
-    buffered = io.BytesIO()
-    image.save(buffered, format=image.format)
-    img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    return img_base64

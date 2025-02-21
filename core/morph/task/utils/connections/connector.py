@@ -185,10 +185,11 @@ class Connector:
             ).query(sql)
             return pd.DataFrame(result)
         elif isinstance(self.connection, DuckDBConnection):
-            from duckdb import query
+            from duckdb import connect
 
             try:
-                return query(sql).to_df()  # type: ignore
+                con = connect()
+                return con.sql(sql).to_df()  # type: ignore
             except Exception as e:
                 print(Fore.RED + f"{e}" + Fore.RESET)
                 print(

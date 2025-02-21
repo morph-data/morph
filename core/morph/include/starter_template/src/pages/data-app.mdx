@@ -1,0 +1,71 @@
+import { defineState } from '@morph-data/components';
+export const { chartType } = defineState({ chartType: 'stacked' });
+
+# Data App 📊
+
+<Callout title="Info" variant="default">
+Before using this app, please install the following dependencies:
+
+```bash
+pip install plotly
+```
+</Callout>
+
+Sample data app with metrics, table and chart. It shows your how to build a Data App with Morph's built-in components.
+
+<Accordion title="About the Data" className="my-4">
+  <p>
+    This report is based on the following data retrieved by DuckDB:
+  </p>
+```sql
+select
+  Date as data,
+  Source as source,
+  Traffic as traffic,
+  Orders as orders
+from
+  read_csv("data/Traffic_Orders_Demo_Data.csv")
+where
+  Date >= '2023-01-01'
+```
+</Accordion>
+
+
+<Grid cols="2" className="py-4">
+  <Card>
+    ## Metrics
+
+    <MetricsGrid
+      loadData="example_metrics"
+      cols="2"
+      value="value"
+      label="label"
+    />
+  </Card>
+
+  <Card>
+    ## DataTable
+
+    <DataTable loadData="example_data" height={300} />
+  </Card>
+</Grid>
+
+<Grid cols="1">
+  <Card>
+    ### Chart
+    <div className="py-4">
+      <Select state={chartType}>
+        <SelectItem value="stacked">Stacked chart</SelectItem>
+      <SelectItem value="line">Line chart</SelectItem>
+      <SelectItem value="area">Area chart</SelectItem>
+    </Select>
+  </div>
+  <Embed
+    loadData="example_chart"
+    height={300}
+    variables={{
+      chartType: chartType.value
+      }}
+    />
+  </Card>
+</Grid>
