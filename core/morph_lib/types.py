@@ -24,14 +24,6 @@ class ImageResponse(BaseModel):
         super().__init__(value=value)
 
 
-class HtmlImageResponse(BaseModel):
-    html: Optional[str] = None
-    image: Optional[str] = None
-
-    def __init__(self, html: Optional[str] = None, image: Optional[str] = None):
-        super().__init__(html=html, image=image)
-
-
 class MorphChatStreamChunk(BaseModel):
     text: Optional[str] = Field(default="")
     content: Optional[str] = Field(default="")
