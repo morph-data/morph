@@ -1,14 +1,11 @@
-import base64
-import io
 import sys
 from typing import Any, Dict, Literal, Optional, Union
 
 import pandas as pd
-from PIL import Image
 
 
 def convert_file_output(
-    type: Literal["json", "html", "image", "markdown"],
+    type: Literal["json", "html", "markdown"],
     output_path: str,
     ext: str,
     limit: Optional[int] = None,
@@ -37,14 +34,6 @@ def convert_file_output(
     elif type == "html" or type == "markdown":
         with open(output_path, "r") as f:
             return f.read()
-    elif type == "image":
-        with open(output_path, "rb") as f:
-            image = Image.open(f)
-            image.load()
-        buffered = io.BytesIO()
-        image.save(buffered, format=image.format)
-        img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-        return img_base64
 
 
 def convert_variables_values(variables: Optional[Dict[str, Any]]) -> Dict[str, Any]:
