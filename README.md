@@ -43,10 +43,8 @@ Understanding the concept of developing an AI app in Morph will let you do a fly
 .
 ├─ pages
 │  └─ index.mdx
-├─ python
-│  └─ closing_deals_vis.py
-└─ sql
-   └─ closing_deals.sql
+└─ python
+   └─ chat.py
 ```
 
 ## Building AI Apps
@@ -55,7 +53,7 @@ Understanding the concept of developing an AI app in Morph will let you do a fly
 
 1. Create each files in `python` and `pages` directories.
 
-Python: Using Plotly to create a AI Pipeline.
+Python: Using Plotly to create a AI workflow.
 
 ```python
 import morph
