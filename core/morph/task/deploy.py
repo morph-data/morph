@@ -332,8 +332,8 @@ class DeployTask(BaseTask):
         click.echo(click.style("Building frontend...", fg="blue"))
         try:
             # Run npm install and build
-            subprocess.run(["npm", "install"], cwd=self.project_root, check=True)
-            subprocess.run(["npm", "run", "build"], cwd=self.project_root, check=True)
+            subprocess.run(["npm", "install"], cwd=self.project_root, check=True, shell=True)
+            subprocess.run(["npm", "run", "build"], cwd=self.project_root, check=True, shell=True)
 
         except subprocess.CalledProcessError as e:
             click.echo(click.style(f"Error building frontend: {str(e)}", fg="red"))
