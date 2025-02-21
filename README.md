@@ -43,10 +43,8 @@ Understanding the concept of developing an AI app in Morph will let you do a fly
 .
 ├─ pages
 │  └─ index.mdx
-├─ python
-│  └─ closing_deals_vis.py
-└─ sql
-   └─ closing_deals.sql
+└─ python
+   └─ chat.py
 ```
 
 ## Building AI Apps
