@@ -1,8 +1,9 @@
+import json
 import logging
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, File, Header, Security, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
 from morph.api.auth import auth
@@ -80,25 +81,39 @@ async def vm_run_file_stream(
 
     if is_error:
         if isinstance(error, ApiBaseError):
-            return JSONResponse(
-                content={
-                    "error": {
-                        "code": error.code,
-                        "message": error.message,
-                        "detail": error.detail,
+            return StreamingResponse(
+                content=json.dumps(
+                    {
+                        "error": {
+                            "code": error.code,
+                            "message": error.message,
+                            "detail": error.detail,
+                        }
                     }
-                },
+                ),
                 status_code=InternalError().status,
+                media_type="text/event-stream",
+                headers={
+                    "Transfer-Encoding": "chunked",
+                    "Content-Type": "text/event-stream",
+                },
             )
-        return JSONResponse(
-            content={
-                "error": {
-                    "code": InternalError().code,
-                    "message": InternalError().message,
-                    "detail": str(error),
+        return StreamingResponse(
+            content=json.dumps(
+                {
+                    "error": {
+                        "code": InternalError().code,
+                        "message": InternalError().message,
+                        "detail": str(error),
+                    }
                 }
-            },
+            ),
             status_code=InternalError().status,
+            media_type="text/event-stream",
+            headers={
+                "Transfer-Encoding": "chunked",
+                "Content-Type": "text/event-stream",
+            },
         )
 
     async def _generate_content():
