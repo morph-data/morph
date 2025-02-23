@@ -29,7 +29,6 @@ def _get_morph_function_id(func: Callable) -> str:
 def func(
     name: str | None = None,
     description: str | None = None,
-    title: str | None = None,
     result_cache_ttl: Optional[int] = None,
     alias: str | None = None,
     **kwargs: dict[str, Any],
@@ -57,7 +56,6 @@ def func(
             name=name or func.__name__,
             function=func,
             description=description,
-            title=title,
             variables=variables,
             data_requirements=data_requirements,
             output_paths=default_output_paths(),
