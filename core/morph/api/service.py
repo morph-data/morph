@@ -7,14 +7,14 @@ import tempfile
 import time
 import uuid
 from contextlib import redirect_stdout
+from pathlib import Path
 from typing import Any
 
 import click
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
-from morph.api.error import ErrorCode, ErrorMessage, RequestError, WarningError
-from morph.api.types import (
+from morph.api.custom_types import (
     RunFileService,
     RunFileStreamService,
     RunFileWithTypeResponse,
@@ -22,13 +22,13 @@ from morph.api.types import (
     SuccessResponse,
     UploadFileService,
 )
+from morph.api.error import ErrorCode, ErrorMessage, RequestError, WarningError
 from morph.api.utils import (
     convert_file_output,
     convert_variables_values,
     set_command_args,
 )
 from morph.cli.flags import Flags
-from morph.config.project import default_output_paths
 from morph.task.resource import PrintResourceTask
 from morph.task.run import RunTask
 from morph.task.utils.morph import find_project_root_dir
@@ -116,20 +116,12 @@ def run_file_with_type_service(
     execution_cache.update_cache(input.name, output_paths)
 
     output_path = output_paths[0]
-    if input.type == "image" or input.type == "html":
+    if input.type == "html":
         if len(output_paths) == 2:
-            if input.type == "image" and output_path.endswith(".html"):
-                output_path = output_paths[1]
-            elif input.type == "html" and not output_path.endswith(".html"):
+            if input.type == "html" and not output_path.endswith(".html"):
                 output_path = output_paths[1]
         elif len(output_paths) == 1:
-            if input.type == "image" and output_path.endswith(".html"):
-                raise WarningError(
-                    ErrorCode.ExecutionError,
-                    ErrorMessage.ExecutionErrorMessage["executionFailed"],
-                    "image not found",
-                )
-            elif (
+            if (
                 input.type == "html"
                 and not output_path.endswith(".html")
                 and not output_path.endswith(".txt")
@@ -324,9 +316,11 @@ async def file_upload_service(input: UploadFileService) -> Any:
             )
         )
 
-        # Retrieve the result of the file_upload function
-        output_file = default_output_paths()[0]
-        with open(output_file, "r") as f:
+        # Read the saved file path from the cache (always created as following path)
+        cache_file = Path(find_project_root_dir()).joinpath(
+            ".morph/cache/file_upload.md"
+        )
+        with open(cache_file, "r") as f:
             saved_filepath = f.read()
 
         # Remove the temporary directory

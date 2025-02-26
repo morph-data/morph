@@ -164,23 +164,27 @@ class NewTask(BaseTask):
                 # Prepare the dependency argument
                 if self.is_development:
                     branch = self._get_current_git_branch() or "develop"
-                    dependency = f"git+https://github.com/morph-data/morph.git@{branch}"
-                else:
-                    dependency = (
-                        f"morph-data=={morph_data_version}"
-                        if morph_data_version
-                        else "morph-data"
+                    morph_data_dep = (
+                        'morph-data = { git = "https://github.com/morph-data/morph.git", rev = "%s" }'
+                        % branch
                     )
+                else:
+                    if morph_data_version:
+                        morph_data_dep = f'morph-data = "{morph_data_version}"'
+                    else:
+                        morph_data_dep = "morph-data"
 
-                # Use poetry init with the --dependency option
-                subprocess.run(
-                    ["poetry", "init", "--no-interaction", "--dependency", dependency],
-                    check=True,
+                # Generate the pyproject.toml content
+                pyproject_content = self._generate_pyproject_toml(
+                    project_name=os.path.basename(os.path.normpath(self.project_root)),
+                    morph_data_dependency=morph_data_dep,
                 )
+                pyproject_path = Path(self.project_root) / "pyproject.toml"
+                pyproject_path.write_text(pyproject_content, encoding="utf-8")
 
                 click.echo(
                     click.style(
-                        f"Added 'morph-data' to pyproject.toml with {dependency}.",
+                        "Added 'morph-data' to pyproject.toml with 'morph-data'.",
                         fg="green",
                     )
                 )
@@ -301,3 +305,48 @@ class NewTask(BaseTask):
             )
 
         return selected_version
+
+    @staticmethod
+    def _get_git_author_info() -> str:
+        """
+        Try to obtain author info from git config user.name and user.email.
+        Return "Name <email>" if possible, otherwise return empty string.
+        """
+        try:
+            name = subprocess.check_output(
+                ["git", "config", "user.name"], text=True
+            ).strip()
+            email = subprocess.check_output(
+                ["git", "config", "user.email"], text=True
+            ).strip()
+            if name and email:
+                return f"{name} <{email}>"
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+        return ""
+
+    def _generate_pyproject_toml(
+        self,
+        project_name: str,
+        morph_data_dependency: str,
+    ) -> str:
+        author = self._get_git_author_info()
+        authors_line = f'authors = ["{author}"]\n' if author else ""
+
+        return f"""[tool.poetry]
+name = "{project_name}"
+version = "0.1.0"
+description = ""
+{authors_line}readme = "README.md"
+packages = [
+    {{ include = "src" }}
+]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+{morph_data_dependency}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+"""

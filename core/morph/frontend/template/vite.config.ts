@@ -4,13 +4,9 @@ import { resolve } from "path";
 import ViteRestart from "vite-plugin-restart";
 import mdx from "@mdx-js/rollup";
 import remarkGfm from "remark-gfm";
-import rehypePrettyCode from "rehype-pretty-code";
 import rehypeExtractToc from "@stefanprobst/rehype-extract-toc";
 import rehypeExtractTocMdxExport from "@stefanprobst/rehype-extract-toc/mdx";
 import rehypeSlug from "rehype-slug";
-
-/** @type {import('rehype-pretty-code').Options} */
-const prettyCodeOptions = { theme: "github-dark" };
 
 // https://vitejs.dev/config/
 export default defineConfig((env) => ({
@@ -22,7 +18,6 @@ export default defineConfig((env) => ({
         remarkPlugins: [remarkGfm],
         rehypePlugins: [
           rehypeSlug,
-          [rehypePrettyCode, prettyCodeOptions],
           rehypeExtractToc,
           rehypeExtractTocMdxExport,
         ],

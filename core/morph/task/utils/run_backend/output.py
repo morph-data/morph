@@ -4,21 +4,15 @@ import io
 import json
 import logging
 import os
+import sys
 import threading
 import traceback
-from typing import Any, Dict, Generator, List, Literal, Optional, Union, cast
+from typing import Any, Dict, Generator, List, Literal, Optional, cast
 
 import click
 import pandas as pd
-import plotly.graph_objects
-import plotly.io as pio
 import pyarrow
-from morph_lib.types import (
-    HtmlImageResponse,
-    HtmlResponse,
-    MarkdownResponse,
-    MorphChatStreamChunk,
-)
+from morph_lib.types import HtmlResponse, MarkdownResponse, MorphChatStreamChunk
 from pydantic import BaseModel
 
 from morph.config.project import MorphProject, default_output_paths
@@ -102,26 +96,11 @@ def transform_output(resource: MorphFunctionMetaObject, output: Any) -> Any:
             transformed_output = json.dumps(
                 transformed_output, ensure_ascii=False, indent=4
             )
-        elif output_type == "visualization":
-            transformed_output = [
-                _get_html_from_plotly_image(output, "html"),
-                _get_html_from_plotly_image(output, "png"),
-            ]
     else:
         if isinstance(output, pd.DataFrame):
             transformed_output = try_parquet_conversion(output)
         elif isinstance(output, dict):
             transformed_output = json.dumps(output, indent=4, ensure_ascii=False)
-        elif _is_matplotlib_figure(output):
-            transformed_output = [
-                _get_html_from_mpl_image(output, "html"),
-                _get_html_from_mpl_image(output, "png"),
-            ]
-        elif isinstance(output, plotly.graph_objects.Figure):
-            transformed_output = [
-                _get_html_from_plotly_image(output, "html"),
-                _get_html_from_plotly_image(output, "png"),
-            ]
 
     return transformed_output
 
@@ -197,7 +176,15 @@ def stream_and_write_and_response(
                 if err:
                     raise Exception(err)
                 else:
-                    filepath = resource.id.split(":")[0]
+                    if sys.platform == "win32":
+                        if len(resource.id.split(":")) > 2:
+                            filepath = (
+                                resource.id.rsplit(":", 1)[0] if resource.id else ""
+                            )
+                        else:
+                            filepath = resource.id if resource.id else ""
+                    else:
+                        filepath = resource.id.split(":")[0]
                     logger.info(f"Successfully ran file 🎉: {filepath}")
 
         import asyncio
@@ -238,7 +225,13 @@ def stream_and_write_and_response(
             if err:
                 raise Exception(err)
             else:
-                filepath = resource.id.split(":")[0]
+                if sys.platform == "win32":
+                    if len(resource.id.split(":")) > 2:
+                        filepath = resource.id.rsplit(":", 1)[0] if resource.id else ""
+                    else:
+                        filepath = resource.id if resource.id else ""
+                else:
+                    filepath = resource.id.split(":")[0]
                 logger.info(f"Successfully ran file 🎉: {filepath}")
 
 
@@ -329,14 +322,6 @@ def convert_run_result(output: Any) -> Any:
         return MarkdownResponse(output)
     elif isinstance(output, dict):
         return pd.DataFrame.from_dict(output, orient="index").T
-    elif _is_matplotlib_figure(output):
-        html = _get_html_from_mpl_image(output, "html")
-        image = _get_html_from_mpl_image(output, "png")
-        return HtmlImageResponse(html=html, image=image)
-    elif isinstance(output, plotly.graph_objects.Figure):
-        html = _get_html_from_plotly_image(output, "html")
-        image = _get_html_from_plotly_image(output, "png")
-        return HtmlImageResponse(html=html, image=image)
 
     return output
 
@@ -359,8 +344,6 @@ def _infer_output_type(output: Any) -> Optional[str]:
     elif isinstance(output, list):
         return "visualization"
     elif isinstance(output, HtmlResponse):
-        return "visualization"
-    elif isinstance(output, HtmlImageResponse):
         return "visualization"
     elif isinstance(output, MarkdownResponse):
         return "markdown"
@@ -439,9 +422,16 @@ def _save_output_to_file(
             else:
                 output_paths = [os.path.splitext(output_paths[0])[0] + ".stream.json"]
 
+    if sys.platform == "win32":
+        if len(resource.id.split(":")) > 2:
+            path = resource.id.rsplit(":", 1)[0] if resource.id else ""
+        else:
+            path = resource.id if resource.id else ""
+    else:
+        path = resource.id.split(":")[0] if resource.id else ""
     resource_ = Resource(
         alias=resource.name if resource.name else "",
-        path=resource.id.split(":")[0] if resource.id else "",
+        path=path,
         connection=resource.connection,
         output_paths=output_paths,
         output_type=output_type,
@@ -453,8 +443,6 @@ def _save_output_to_file(
         output = output.value
     elif isinstance(output, MarkdownResponse):
         output = output.value
-    elif isinstance(output, HtmlImageResponse):
-        output = [output.html, output.image]
 
     resource_ = resource_.save_output_to_file(run_id, output, logger)
     return resource_.output_paths
@@ -471,45 +459,6 @@ def _get_html_from_mpl_image(fig: Any, format: VISUALIZATION_FORMAT = "html") ->
         return base64.b64encode(buf.read()).decode()
     elif format == "html":
         return f'<img src="data:image/png;base64,{base64.b64encode(buf.read()).decode()}" />'
-
-
-def _get_html_from_plotly_image(fig: Any, format: VISUALIZATION_FORMAT = "html") -> str:
-    buf: Union[io.BytesIO, io.StringIO]
-    if format == "png":
-        pio.kaleido.scope.chromium_args += ("--single-process",)
-        buf = io.BytesIO()
-        fig.write_image(buf, format="png")
-        buf.seek(0)
-        return base64.b64encode(buf.read()).decode()
-    elif format == "html":
-        buf = io.StringIO()
-        fig.write_html(
-            buf,
-            include_plotlyjs="cdn",
-            full_html=False,
-            config={
-                "modeBarButtonsToRemove": [
-                    "zoom",
-                    "pan",
-                    "select",
-                    "zoomIn",
-                    "zoomOut",
-                    "autoScale",
-                    "resetScale",
-                    "lasso2d",
-                ],
-                "displaylogo": False,
-            },
-        )
-        buf.seek(0)
-        return buf.getvalue()
-
-
-def _is_matplotlib_figure(output: Any) -> bool:
-    try:
-        return hasattr(output, "savefig") and callable(output.savefig)
-    except Exception:  # noqa
-        return False
 
 
 def _is_openai_chunk(output: Any) -> bool:
