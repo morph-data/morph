@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </Head>
             <PageSkeleton
               routes={routes}
-              title={pageModule?.title || firstHeading?.value || "Untitled"}
+              title={title}
               showAdminPage={showAdminPage}
               toc={pageModule?.tableOfContents}
             >
