@@ -216,3 +216,21 @@ def context(
     task.run()
 
     return None, True
+
+
+@cli.command("add")
+@click.argument("plugin_name", required=True)
+@click.pass_context
+@global_flags
+@requires.preflight
+@requires.postflight
+def add_plugin(
+    ctx: click.Context, **kwargs: Dict[str, Union[str, int, bool]]
+) -> Tuple[None, bool]:
+    """Add a plugin to your project."""
+    from morph.task.plugin import PluginTask
+
+    task = PluginTask(ctx.obj["flags"])
+    task.run()
+
+    return None, True
