@@ -4,12 +4,10 @@ import json
 from typing import Any, List, Optional, Union, get_args
 
 import pandas as pd
-import urllib3
 from morph_lib.error import MorphApiError
 from morph_lib.utils.db_connector import DBConnector
 from morph_lib.utils.sql import SQLUtils
 from pydantic import BaseModel, Field
-from urllib3.exceptions import InsecureRequestWarning
 
 from morph.api.cloud.client import MorphApiClient, MorphApiKeyClientImpl
 from morph.config.project import MorphProject, load_project
@@ -22,8 +20,6 @@ from morph.task.utils.connection import (
 )
 from morph.task.utils.connections.connector import Connector
 from morph.task.utils.morph import find_project_root_dir
-
-urllib3.disable_warnings(InsecureRequestWarning)
 
 
 # ===============================================

@@ -80,18 +80,14 @@ def _import_python_file(
     try:
         spec.loader.exec_module(module)
     except Exception as e:
-        if isinstance(e, SyntaxError):
-            return None, MorphFunctionLoadError(
-                category=MorphFunctionLoadErrorCategory.INVALID_SYNTAX,
-                file_path=module_path,
-                name=module_name,
-                error=f"Syntax error: {e}",
-            )
+        import traceback
+
+        error_message = "".join(traceback.format_exception(type(e), e, e.__traceback__))
         return None, MorphFunctionLoadError(
             category=MorphFunctionLoadErrorCategory.IMPORT_ERROR,
             file_path=module_path,
             name=module_name,
-            error=f"Fail to evaluate module: {e}",
+            error=error_message,
         )
 
     return ScanResult(file_path=module_path, checksum=get_checksum(file)), None
