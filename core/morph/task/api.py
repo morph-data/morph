@@ -173,8 +173,6 @@ class ApiTask(BaseTask):
                 stderr=subprocess.PIPE if is_debug else subprocess.DEVNULL,
                 text=True,
             )
-        a = ""
-        a.startswith
 
         def log_output(pipe):
             for line in iter(pipe.readline, ""):

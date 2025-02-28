@@ -28,7 +28,11 @@ class MorphFunctionLoadError(BaseModel):
         ]
         for i, error in enumerate(errors):
             error_txt.append(
-                f"{Fore.RED}[ERROR No.{i+1}]\n{Fore.RED}[error]: {error.category.value}\n{Fore.RED}[name]: {error.name}\n{Fore.RED}[filepath]: {error.file_path}\n{Fore.RED}[detail]: {error.error}"
+                f"""{Fore.RED}[ERROR No.{i+1}]
+{Fore.RED}[error]: {error.category.value}
+{Fore.RED}[name]: {error.name}
+{Fore.RED}[filepath]: {error.file_path}
+{Fore.RED}[detail]: {error.error}"""
             )
         return "\n".join(error_txt)
 
