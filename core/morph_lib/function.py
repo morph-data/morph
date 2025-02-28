@@ -24,6 +24,8 @@ def load_data(alias: str, variables: Optional[Dict[str, Any]] = None) -> Any:
         raise MorphApiError("Project configuration not found.")
 
     context = MorphGlobalContext.get_instance()
+    context.partial_load(project_root, alias)
+
     resource = context.search_meta_object_by_name(alias)
     if not resource:
         raise MorphApiError(f"Resource {alias} not found.")
