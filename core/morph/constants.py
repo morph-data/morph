@@ -6,6 +6,7 @@ class MorphConstant:
 
     INIT_DIR = os.path.expanduser("~/.morph")
     TMP_MORPH_DIR = "/tmp/morph"
+    PLUGIN_DIR = "src/plugin"
 
     @staticmethod
     def frontend_dir(project_root: str) -> str:

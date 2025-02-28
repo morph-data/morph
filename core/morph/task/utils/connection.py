@@ -1,7 +1,5 @@
 import json
 import os
-import re
-import time
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
 
@@ -13,7 +11,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from morph.api.cloud.client import MorphApiClient, MorphApiKeyClientImpl
 from morph.constants import MorphConstant
 
-MORPH_BUILTIN_DB_CONNECTION_SLUG = "MORPH_BUILTIN_DB"
 MORPH_DUCKDB_CONNECTION_SLUG = "DUCKDB"
 
 
@@ -650,96 +647,11 @@ class ConnectionYaml(BaseModel):
             return CONNECTION_DETAIL_TYPE.mailchimp_oauth.value
 
     @staticmethod
-    def find_builtin_db_connection() -> tuple[str, PostgresqlConnection]:
-        retry_cnt = 0
-        while True:
-            try:
-                client = MorphApiClient(MorphApiKeyClientImpl)
-                response = client.req.find_database_connection()
-            except requests.exceptions.Timeout:  # noqa
-                click.echo(
-                    click.style(
-                        "Error: Timeout to obtain database connection. Perhaps the db has not been launched yet.",
-                        fg="red",
-                    )
-                )
-                raise SystemError(
-                    "Timeout to obtain database connection. Perhaps the db has not been launched yet."
-                )
-            if response.status_code > 500 or (
-                response.status_code >= 400 and response.status_code < 500
-            ):
-                click.echo(
-                    click.style(
-                        "Error: Unable to fetch builtin db from cloud.",
-                        fg="red",
-                    )
-                )
-                raise SystemError("Unable to fetch builtin db from cloud.")
-            else:
-                if response.status_code == 500:
-                    if retry_cnt < 3:
-                        retry_cnt += 1
-                        time.sleep(1)
-                        continue
-                    click.echo(
-                        click.style(
-                            "Error: Unable to fetch builtin db from cloud.",
-                            fg="red",
-                        )
-                    )
-                    raise SystemError("Unable to fetch builtin db from cloud.")
-
-                response_json = response.json()
-                if (
-                    "error" in response_json
-                    and "subCode" in response_json
-                    and "message" in response_json
-                ):
-                    click.echo(
-                        click.style(
-                            "Error: Unable to fetch builtin db from cloud.",
-                            fg="red",
-                        )
-                    )
-                    raise SystemError("Unable to fetch builtin db from cloud.")
-
-                connection_string = response_json["maskedUrl"]
-                password = response_json["password"]
-                timezone = response_json["timezone"]
-
-                pattern = re.compile(
-                    r"postgresql://(?P<username>[^:]+):(?P<password>[^@]+)@(?P<host>[^/]+)/(?P<database>[^?]+)\?sslmode=require"
-                )
-                match = pattern.search(connection_string)
-                if match is None:
-                    raise SystemError(
-                        "Unable to fetch builtin db from cloud. invalid connection string."
-                    )
-                username = match.group("username")
-                host = match.group("host")
-                database = match.group("database")
-
-                return client.req.project_id, PostgresqlConnection(
-                    type=CONNECTION_TYPE.postgres,
-                    host=host,
-                    user=username,
-                    password=password,
-                    port=5432,
-                    dbname=database,
-                    schema="public",
-                    timezone=timezone,
-                )
-
-    @staticmethod
     def find_cloud_connection(
         connection_slug: str,
     ) -> Connection:
         if connection_slug == MORPH_DUCKDB_CONNECTION_SLUG:
             return DuckDBConnection(type=CONNECTION_TYPE.duckdb)
-        elif connection_slug == MORPH_BUILTIN_DB_CONNECTION_SLUG:
-            _, builtin_connection = ConnectionYaml.find_builtin_db_connection()
-            return builtin_connection
         try:
             try:
                 client = MorphApiClient(MorphApiKeyClientImpl)
