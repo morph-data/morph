@@ -35,7 +35,7 @@ from morph.task.utils.run_backend.state import (
     MorphFunctionMetaObjectCacheManager,
     MorphGlobalContext,
 )
-from morph.task.utils.run_backend.types import CliError, RunStatus
+from morph.task.utils.run_backend.types import RunStatus
 from morph.task.utils.timezone import TimezoneManager
 
 
@@ -185,126 +185,110 @@ class RunTask(BaseTask):
             self.logger.error(self.error)
             self.final_state = RunStatus.FAILED.value
             self.output_paths = finalize_run(
-                self.project,
                 self.resource,
-                self.cell_alias,
-                self.final_state,
                 None,
                 self.logger,
                 self.run_id,
-                CliError(
-                    type="general",
-                    details=self.error,
-                ),
             )
             return
+
+        if not self.resource.name or not self.resource.id:
+            raise FileNotFoundError(f"Invalid metadata: {self.resource}")
+
+        cell = self.resource.name
+        # id is formatted as {filename}:{function_name}
+        if sys.platform == "win32":
+            if len(self.resource.id.split(":")) > 2:
+                filepath = (
+                    self.resource.id.rsplit(":", 1)[0] if self.resource.id else ""
+                )
+            else:
+                filepath = self.resource.id if self.resource.id else ""
         else:
-            if not self.resource.name or not self.resource.id:
-                raise FileNotFoundError(f"Invalid metadata: {self.resource}")
+            filepath = self.resource.id.split(":")[0]
+        self.logger.info(
+            f"Running {self.ext[1:]} file: {filepath}, variables: {self.vars}"
+        )
 
-            cell = self.resource.name
-            # id is formatted as {filename}:{function_name}
-            if sys.platform == "win32":
-                if len(self.resource.id.split(":")) > 2:
-                    filepath = (
-                        self.resource.id.rsplit(":", 1)[0] if self.resource.id else ""
-                    )
-                else:
-                    filepath = self.resource.id if self.resource.id else ""
-            else:
-                filepath = self.resource.id.split(":")[0]
-            self.logger.info(
-                f"Running {self.ext[1:]} file: {filepath}, variables: {self.vars}"
+        try:
+            dag = RunDagArgs(run_id=self.run_id) if self.is_dag else None
+            output = run_cell(
+                self.project,
+                self.resource,
+                self.vars,
+                self.logger,
+                dag,
+                self.meta_obj_cache,
             )
-
-            try:
-                dag = RunDagArgs(run_id=self.run_id) if self.is_dag else None
-                output = run_cell(
-                    self.project,
-                    self.resource,
-                    self.vars,
-                    self.logger,
-                    dag,
-                    self.meta_obj_cache,
-                )
-            except Exception as e:
-                if self.is_dag:
-                    text = str(e)
-                else:
-                    error_txt = (
-                        logging_file_error_exception(e, filepath)
-                        if self.ext == ".py"
-                        else str(e)
-                    )
-                    text = f"An error occurred while running the file 💥: {error_txt}"
-                self.error = text
-                self.logger.error(self.error)
-                click.echo(click.style(self.error, fg="red"))
-                self.final_state = RunStatus.FAILED.value
-                self.output_paths = finalize_run(
-                    self.project,
-                    self.resource,
-                    cell,
-                    self.final_state,
-                    None,
-                    self.logger,
-                    self.run_id,
-                    CliError(
-                        type="general",
-                        details=text,
-                    ),
-                )
-                if self.mode == "api":
-                    raise Exception(text)
-                return
-
-            # print preview of the DataFrame
-            if isinstance(output.result, pd.DataFrame):
-                preview = tabulate(
-                    output.result.head().values.tolist(),
-                    headers=output.result.columns.tolist(),
-                    tablefmt="grid",
-                    showindex=True,
-                )
-                self.logger.info("DataFrame preview:\n" + preview)
-
-            if (
-                is_stream(output.result)
-                or is_async_generator(output.result)
-                or is_generator(output.result)
-            ):
-                if self.mode == "api":
-                    return stream_and_write_and_response(
-                        self.project,
-                        self.resource,
-                        cell,
-                        RunStatus.DONE.value,
-                        transform_output(self.resource, output.result),
-                        self.logger,
-                        self.run_id,
-                        None,
-                    )
-                else:
-                    stream_and_write(
-                        self.project,
-                        self.resource,
-                        cell,
-                        RunStatus.DONE.value,
-                        transform_output(self.resource, output.result),
-                        self.logger,
-                        self.run_id,
-                        None,
-                    )
+        except Exception as e:
+            if self.is_dag:
+                text = str(e)
             else:
-                self.final_state = RunStatus.DONE.value
-                self.output_paths = finalize_run(
+                error_txt = (
+                    logging_file_error_exception(e, filepath)
+                    if self.ext == ".py"
+                    else str(e)
+                )
+                text = f"An error occurred while running the file 💥: {error_txt}"
+            self.error = text
+            self.logger.error(self.error)
+            click.echo(click.style(self.error, fg="red"))
+            self.final_state = RunStatus.FAILED.value
+            self.output_paths = finalize_run(
+                self.resource,
+                None,
+                self.logger,
+                self.run_id,
+            )
+            if self.mode == "api":
+                raise Exception(text)
+            return
+
+        # print preview of the DataFrame
+        if isinstance(output.result, pd.DataFrame):
+            preview = tabulate(
+                output.result.head().values.tolist(),
+                headers=output.result.columns.tolist(),
+                tablefmt="grid",
+                showindex=True,
+            )
+            self.logger.info("DataFrame preview:\n" + preview)
+        else:
+            self.logger.info("Output: " + str(output.result))
+
+        if (
+            is_stream(output.result)
+            or is_async_generator(output.result)
+            or is_generator(output.result)
+        ):
+            if self.mode == "api":
+                return stream_and_write_and_response(
                     self.project,
                     self.resource,
                     cell,
-                    self.final_state,
+                    RunStatus.DONE.value,
                     transform_output(self.resource, output.result),
                     self.logger,
                     self.run_id,
                     None,
                 )
-            self.logger.info(f"Successfully ran file 🎉: {filepath}")
+            else:
+                stream_and_write(
+                    self.project,
+                    self.resource,
+                    cell,
+                    RunStatus.DONE.value,
+                    transform_output(self.resource, output.result),
+                    self.logger,
+                    self.run_id,
+                    None,
+                )
+        else:
+            self.final_state = RunStatus.DONE.value
+            self.output_paths = finalize_run(
+                self.resource,
+                transform_output(self.resource, output.result),
+                self.logger,
+                self.run_id,
+            )
+        self.logger.info(f"Successfully ran file 🎉: {filepath}")

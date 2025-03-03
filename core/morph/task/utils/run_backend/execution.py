@@ -17,11 +17,7 @@ from pydantic import BaseModel
 from morph.config.project import MorphProject, default_output_paths
 from morph.task.utils.connection import Connection, ConnectionYaml, DatabaseConnection
 from morph.task.utils.connections.connector import Connector
-from morph.task.utils.logging import (
-    get_morph_logger,
-    redirect_stdout_to_logger,
-    redirect_stdout_to_logger_async,
-)
+from morph.task.utils.logging import get_morph_logger
 from morph.task.utils.run_backend.errors import logging_file_error_exception
 from morph.task.utils.run_backend.output import (
     convert_run_result,
@@ -32,7 +28,7 @@ from morph.task.utils.run_backend.output import (
     stream_and_write,
     transform_output,
 )
-from morph.task.utils.run_backend.types import CliError, RunStatus
+from morph.task.utils.run_backend.types import RunStatus
 
 from .cache import ExecutionCache
 from .state import (
@@ -312,13 +308,15 @@ def execute_with_logger(meta_obj, context, logger):
         if is_coroutine_function(meta_obj.function):
 
             async def run_async():
-                async with redirect_stdout_to_logger_async(logger, logging.INFO):
-                    return await meta_obj.function(context)
+                # stdout is not formatted with colorlog and timestamp
+                # async with redirect_stdout_to_logger_async(logger, logging.INFO):
+                return await meta_obj.function(context)
 
             result = asyncio.run(run_async())
         else:
-            with redirect_stdout_to_logger(logger, logging.INFO):
-                result = meta_obj.function(context)
+            # stdout is not formatted with colorlog and timestamp
+            # with redirect_stdout_to_logger(logger, logging.INFO):
+            result = meta_obj.function(context)
     except Exception as e:
         raise e
     return result
@@ -512,14 +510,10 @@ def _run_cell_with_dag(
         text = f"An error occurred while running the file: {error_txt}"
         logger.error(text)
         finalize_run(
-            project,
             cell,
-            cell.name,
-            RunStatus.FAILED.value,
             None,
             logger,
             dag.run_id,
-            CliError(type="general", details=text),
         )
         raise Exception(text)
 
@@ -540,14 +534,10 @@ def _run_cell_with_dag(
         )
     else:
         finalize_run(
-            project,
             cell,
-            cell.name,
-            RunStatus.DONE.value,
             transform_output(cell, output.result),
             logger,
             dag.run_id,
-            None,
         )
     logger.info(f"Successfully executed file: {filepath}")
     return output

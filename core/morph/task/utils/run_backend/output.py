@@ -23,7 +23,7 @@ from morph.task.utils.logging import (
 )
 from morph.task.utils.morph import Resource
 from morph.task.utils.run_backend.state import MorphFunctionMetaObject
-from morph.task.utils.run_backend.types import CliError, RunStatus
+from morph.task.utils.run_backend.types import CliError
 
 
 class StreamChatResponse(BaseModel):
@@ -43,17 +43,12 @@ class StreamChatResponse(BaseModel):
 
 
 def finalize_run(
-    project: Optional[MorphProject],
     resource: MorphFunctionMetaObject,
-    cell_alias: str,
-    final_state: str,
     output: Any,
     logger: logging.Logger,
     run_id: str,
-    error: Optional[CliError],
 ) -> Optional[List[str]]:
     return _save_output_to_file(
-        project,
         resource,
         output,
         logger,
@@ -141,8 +136,6 @@ def stream_and_write_and_response(
 
         async def process_async_output():
             err = None
-            final_state_ = final_state
-            error_ = error
             response_data = None
             try:
                 async with redirect_stdout_to_logger_async(logger, logging.INFO):
@@ -150,28 +143,19 @@ def stream_and_write_and_response(
                         dumped_chunk = _dump_and_append_chunk(chunk, data)
                         yield json.dumps(dumped_chunk, ensure_ascii=False)
                 response_data = _convert_stream_response_to_model(data)
-            except Exception as e:
+            except Exception:
                 tb_str = traceback.format_exc()
                 text = f"An error occurred while running the file 💥: {tb_str}"
                 err = text
                 logger.error(f"Error: {text}")
                 click.echo(click.style(text, fg="red"))
-                final_state_ = RunStatus.FAILED.value
-                error_ = CliError(
-                    type="general",
-                    details=str(e),
-                )
                 response_data = None
             finally:
                 finalize_run(
-                    project,
                     resource,
-                    cell_alias,
-                    final_state_,
                     response_data,
                     logger,
                     run_id,
-                    error_,
                 )
                 if err:
                     raise Exception(err)
@@ -199,28 +183,19 @@ def stream_and_write_and_response(
                     dumped_chunk = _dump_and_append_chunk(chunk, data)
                     yield json.dumps(dumped_chunk, ensure_ascii=False)
             response_data = _convert_stream_response_to_model(data)
-        except Exception as e:
+        except Exception:
             tb_str = traceback.format_exc()
             text = f"An error occurred while running the file 💥: {tb_str}"
             err = text
             logger.error(f"Error: {text}")
             click.echo(click.style(text, fg="red"))
-            final_state = RunStatus.FAILED.value
-            error = CliError(
-                type="general",
-                details=str(e),
-            )
             response_data = None
         finally:
             finalize_run(
-                project,
                 resource,
-                cell_alias,
-                final_state,
                 response_data,
                 logger,
                 run_id,
-                error,
             )
             if err:
                 raise Exception(err)
@@ -250,35 +225,24 @@ def stream_and_write(
     if inspect.isasyncgen(output):
 
         async def process_async_output():
-            final_state_ = final_state
-            error_ = error
             response_data = None
             try:
                 async with redirect_stdout_to_logger_async(logger, logging.INFO):
                     async for chunk in output:
                         _dump_and_append_chunk(chunk, data)
                 response_data = _convert_stream_response_to_model(data)
-            except Exception as e:
+            except Exception:
                 tb_str = traceback.format_exc()
                 text = f"An error occurred while running the file 💥: {tb_str}"
                 logger.error(f"Error: {text}")
                 click.echo(click.style(text, fg="red"))
-                final_state_ = RunStatus.FAILED.value
-                error_ = CliError(
-                    type="general",
-                    details=str(e),
-                )
                 response_data = None
             finally:
                 finalize_run(
-                    project,
                     resource,
-                    cell_alias,
-                    final_state_,
                     response_data,
                     logger,
                     run_id,
-                    error_,
                 )
 
         import asyncio
@@ -291,38 +255,22 @@ def stream_and_write(
                 for chunk in output:
                     _dump_and_append_chunk(chunk, data)
             response_data = _convert_stream_response_to_model(data)
-        except Exception as e:
+        except Exception:
             tb_str = traceback.format_exc()
             text = f"An error occurred while running the file 💥: {tb_str}"
             logger.error(f"Error: {text}")
             click.echo(click.style(text, fg="red"))
-            final_state = RunStatus.FAILED.value
-            error = CliError(
-                type="general",
-                details=str(e),
-            )
             response_data = None
         finally:
             finalize_run(
-                project,
                 resource,
-                cell_alias,
-                final_state,
                 response_data,
                 logger,
                 run_id,
-                error,
             )
 
 
 def convert_run_result(output: Any) -> Any:
-    if output is None:
-        return None
-    elif isinstance(output, str):
-        return MarkdownResponse(output)
-    elif isinstance(output, dict):
-        return pd.DataFrame.from_dict(output, orient="index").T
-
     return output
 
 
@@ -351,9 +299,7 @@ def _infer_output_type(output: Any) -> Optional[str]:
         return None
 
 
-def _get_output_paths(
-    project: Optional[MorphProject], resource: MorphFunctionMetaObject
-) -> List[str]:
+def _get_output_paths(resource: MorphFunctionMetaObject) -> List[str]:
     output_paths = default_output_paths()
     if resource.output_paths and len(resource.output_paths) > 0:
         output_paths = cast(list, resource.output_paths)
@@ -385,7 +331,6 @@ def _get_output_paths(
 
 
 def _save_output_to_file(
-    project: Optional[MorphProject],
     resource: MorphFunctionMetaObject,
     output: Any,
     logger: logging.Logger,
@@ -395,7 +340,7 @@ def _save_output_to_file(
         resource.output_type if resource.output_type else _infer_output_type(output)
     )
 
-    output_paths: List[str] = _get_output_paths(project, resource)
+    output_paths: List[str] = _get_output_paths(resource)
 
     if isinstance(output, MarkdownResponse):
         if len(output_paths) > 0:

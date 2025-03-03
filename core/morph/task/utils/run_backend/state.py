@@ -256,7 +256,7 @@ class MorphGlobalContext:
                     category=MorphFunctionLoadErrorCategory.IMPORT_ERROR,
                     file_path="",
                     name=target_name,
-                    error="Not found",
+                    error="Alias not found",
                 )
             ]
 
