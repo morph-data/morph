@@ -274,14 +274,10 @@ class RunTask(BaseTask):
                 )
             else:
                 stream_and_write(
-                    self.project,
                     self.resource,
-                    cell,
-                    RunStatus.DONE.value,
                     transform_output(self.resource, output.result),
                     self.logger,
                     self.run_id,
-                    None,
                 )
         else:
             self.final_state = RunStatus.DONE.value

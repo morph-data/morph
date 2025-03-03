@@ -28,7 +28,6 @@ from morph.task.utils.run_backend.output import (
     stream_and_write,
     transform_output,
 )
-from morph.task.utils.run_backend.types import RunStatus
 
 from .cache import ExecutionCache
 from .state import (
@@ -523,14 +522,10 @@ def _run_cell_with_dag(
         or is_generator(output.result)
     ):
         stream_and_write(
-            project,
             cell,
-            cell.name,
-            RunStatus.DONE.value,
             transform_output(cell, output.result),
             logger,
             dag.run_id,
-            None,
         )
     else:
         finalize_run(

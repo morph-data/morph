@@ -211,14 +211,10 @@ def stream_and_write_and_response(
 
 
 def stream_and_write(
-    project: Optional[MorphProject],
     resource: MorphFunctionMetaObject,
-    cell_alias: str,
-    final_state: str,
     output: Any,
     logger: logging.Logger,
     run_id: str,
-    error: Optional[CliError],
 ) -> None:
     data: List[Dict[str, Any]] = []
 
