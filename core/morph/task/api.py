@@ -13,7 +13,6 @@ from dotenv import dotenv_values, load_dotenv
 from morph.cli.flags import Flags
 from morph.task.base import BaseTask
 from morph.task.utils.morph import find_project_root_dir, initialize_frontend_dir
-from morph.task.utils.timezone import TimezoneManager
 
 
 class ApiTask(BaseTask):
@@ -43,21 +42,6 @@ class ApiTask(BaseTask):
         env_vars = dotenv_values(dotenv_path)
         for e_key, e_val in env_vars.items():
             os.environ[e_key] = str(e_val)
-
-        # set timezone if specified
-        desired_tz = os.getenv("TZ")
-        if desired_tz is not None:
-            tz_manager = TimezoneManager()
-            if not tz_manager.is_valid_timezone(desired_tz):
-                click.echo(
-                    click.style(
-                        "Warning: Invalid TZ value in .env. Falling back to system timezone.",
-                        fg="yellow",
-                    ),
-                    err=False,
-                )
-            else:
-                tz_manager.set_timezone(desired_tz)
 
         # Initialize the frontend directory
         # Copy the frontend template to ~/.morph/frontend if it doesn't exist
