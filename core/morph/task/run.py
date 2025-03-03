@@ -36,7 +36,6 @@ from morph.task.utils.run_backend.state import (
     MorphGlobalContext,
 )
 from morph.task.utils.run_backend.types import CliError, RunStatus
-from morph.task.utils.timezone import TimezoneManager
 
 
 class RunTask(BaseTask):
@@ -168,16 +167,6 @@ class RunTask(BaseTask):
         env_vars = dotenv_values(dotenv_path)
         for e_key, e_val in env_vars.items():
             os.environ[e_key] = str(e_val)
-
-        desired_tz = os.getenv("TZ")
-        if desired_tz is not None:
-            tz_manager = TimezoneManager()
-            if not tz_manager.is_valid_timezone(desired_tz):
-                self.logger.warning(
-                    "Warning: Invalid TZ value in .env. Falling back to system timezone.",
-                )
-            else:
-                tz_manager.set_timezone(desired_tz)
 
     def run(self) -> Any:
         if self.ext != ".sql" and self.ext != ".py":
