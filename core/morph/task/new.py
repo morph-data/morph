@@ -200,12 +200,12 @@ class NewTask(BaseTask):
                 if self.is_development:
                     branch = self._get_current_git_branch() or "develop"
                     morph_data_dep = (
-                        'morph-data = { git = "https://github.com/morph-data/morph.git", rev = "%s" }'
+                        f"git+https://github.com/morph-data/morph.git@{branch}#egg=morph-data"
                         % branch
                     )
                 else:
                     if morph_data_version:
-                        morph_data_dep = f'morph-data="{morph_data_version}"'
+                        morph_data_dep = f'"morph-data={morph_data_version}"'
                     else:
                         morph_data_dep = "morph-data"
 
