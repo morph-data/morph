@@ -1,3 +1,4 @@
+import asyncio
 import io
 import json
 import logging
@@ -225,7 +226,9 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
                 if first_chunk:
                     first_chunk = False
                     yield '{"chunks": ['
+                    await asyncio.sleep(0)
                 yield c + ","
+                await asyncio.sleep(0)
 
             yield "]}"
         except Exception as e:

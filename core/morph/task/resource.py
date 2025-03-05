@@ -50,7 +50,7 @@ class PrintResourceTask(BaseTask):
 
     def run(self):
         try:
-            cache = MorphFunctionMetaObjectCacheManager().load_cache(self.project_root)
+            cache = MorphFunctionMetaObjectCacheManager().get_cache()
         except (pydantic.ValidationError, json.decoder.JSONDecodeError):
             click.echo(
                 click.style(

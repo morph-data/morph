@@ -93,9 +93,7 @@ class RunTask(BaseTask):
             )
             errors = context.load(self.project_root)
             context.dump()
-        self.meta_obj_cache = MorphFunctionMetaObjectCacheManager().load_cache(
-            self.project_root
-        )
+        self.meta_obj_cache = MorphFunctionMetaObjectCacheManager().get_cache()
 
         if len(errors) > 0:
             if self.mode == "api":

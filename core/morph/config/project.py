@@ -17,7 +17,6 @@ class MorphProject(BaseModel):
     profile: Optional[str] = "default"
     source_paths: List[str] = Field(default_factory=lambda: ["src"])
     default_connection: Optional[str] = MORPH_DUCKDB_CONNECTION_SLUG
-    result_cache_ttl: Optional[int] = Field(default=0)
     project_id: Optional[str] = Field(default=None)
     package_manager: str = Field(
         default="pip", description="Package manager to use, e.g., pip or poetry."
