@@ -113,27 +113,45 @@ def stream_and_write_and_response(
 ) -> Generator[str, None, None]:
     data: List[Dict[str, Any]] = []
     if inspect.isasyncgen(output):
-
-        async def process_async_output():
-            err = None
-            try:
-                async with redirect_stdout_to_logger_async(logger, logging.INFO):
-                    async for chunk in output:
-                        dumped_chunk = _dump_and_append_chunk(chunk, data)
-                        yield json.dumps(dumped_chunk, ensure_ascii=False)
-            except Exception:
-                tb_str = traceback.format_exc()
-                text = f"An error occurred while running the file 💥: {tb_str}"
-                err = text
-                logger.error(f"Error: {text}")
-                click.echo(click.style(text, fg="red"))
-            finally:
-                if err:
-                    raise Exception(err)
-
         import asyncio
+        from queue import Queue
 
-        asyncio.run(process_async_output())
+        queue: Queue = Queue()
+        sentinel = object()
+
+        def async_thread():
+            async def process_async_output():
+                try:
+                    async with redirect_stdout_to_logger_async(logger, logging.INFO):
+                        async for chunk in output:
+                            dumped_chunk = _dump_and_append_chunk(chunk, data)
+                            queue.put(json.dumps(dumped_chunk, ensure_ascii=False))
+                except Exception:
+                    tb_str = traceback.format_exc()
+                    text = f"An error occurred while running the file 💥: {tb_str}"
+                    logger.error(f"Error: {text}")
+                    queue.put(Exception(text))
+                finally:
+                    queue.put(sentinel)
+
+            try:
+                asyncio.run(process_async_output())
+            except Exception as e:
+                queue.put(e)
+                queue.put(sentinel)
+
+        thread = threading.Thread(target=async_thread)
+        thread.start()
+
+        while True:
+            item = queue.get()
+            if item is sentinel:
+                break
+            if isinstance(item, Exception):
+                raise item
+            yield item
+
+        thread.join()
     else:
         err = None
         try:
