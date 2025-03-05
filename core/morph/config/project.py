@@ -27,11 +27,11 @@ class MorphProject(BaseModel):
         arbitrary_types_allowed = True
 
 
-def default_output_paths() -> List[str]:
+def default_output_paths(ext: str, alias: str) -> List[str]:
     project_root = find_project_root_dir()
     if not os.access(project_root, os.W_OK):
-        return [f"{MorphConstant.TMP_MORPH_DIR}/cache/{{name}}{{ext()}}"]
-    return [f"{project_root}/.morph/cache/{{name}}{{ext()}}"]
+        return [f"{MorphConstant.TMP_MORPH_DIR}/cache/{alias}{ext}"]
+    return [f"{project_root}/.morph/cache/{alias}{ext}"]
 
 
 def default_initial_project() -> MorphProject:

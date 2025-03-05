@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import File, UploadFile
 from pydantic import BaseModel
@@ -33,7 +33,7 @@ class RunFileWithTypeService(BaseModel):
 
 class RunFileWithTypeResponse(BaseModel):
     type: Literal["json", "html", "image", "markdown"]
-    data: Union[str, Dict[str, Any]]
+    data: Any
 
 
 # ================================================

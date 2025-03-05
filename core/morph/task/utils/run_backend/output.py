@@ -1,13 +1,10 @@
-import base64
 import inspect
-import io
 import json
 import logging
-import os
 import sys
 import threading
 import traceback
-from typing import Any, Dict, Generator, List, Literal, Optional, cast
+from typing import Any, Dict, Generator, List, Optional
 
 import click
 import pandas as pd
@@ -15,15 +12,13 @@ import pyarrow
 from morph_lib.types import HtmlResponse, MarkdownResponse, MorphChatStreamChunk
 from pydantic import BaseModel
 
-from morph.config.project import MorphProject, default_output_paths
-from morph.constants import MorphConstant
+from morph.config.project import default_output_paths
 from morph.task.utils.logging import (
     redirect_stdout_to_logger,
     redirect_stdout_to_logger_async,
 )
 from morph.task.utils.morph import Resource
 from morph.task.utils.run_backend.state import MorphFunctionMetaObject
-from morph.task.utils.run_backend.types import CliError, RunStatus
 
 
 class StreamChatResponse(BaseModel):
@@ -43,27 +38,19 @@ class StreamChatResponse(BaseModel):
 
 
 def finalize_run(
-    project: Optional[MorphProject],
     resource: MorphFunctionMetaObject,
-    cell_alias: str,
-    final_state: str,
     output: Any,
     logger: logging.Logger,
-    run_id: str,
-    error: Optional[CliError],
 ) -> Optional[List[str]]:
     return _save_output_to_file(
-        project,
         resource,
         output,
         logger,
-        run_id,
     )
 
 
-def transform_output(resource: MorphFunctionMetaObject, output: Any) -> Any:
+def transform_output(output: Any) -> Any:
     transformed_output: Any = output
-    output_type = resource.output_type if resource.output_type else None
 
     def try_parquet_conversion(df):
         try:
@@ -81,26 +68,20 @@ def transform_output(resource: MorphFunctionMetaObject, output: Any) -> Any:
             )
             return df.to_parquet(index=False, engine="pyarrow")
 
-    if output_type is not None:
-        if output_type == "dataframe" and isinstance(output, pd.DataFrame):
-            transformed_output = try_parquet_conversion(output)
-        elif output_type == "csv" and isinstance(output, pd.DataFrame):
-            transformed_output = output.to_csv(index=False)
-        elif output_type == "markdown" and isinstance(output, str):
-            transformed_output = str(output)
-        elif output_type == "json" and isinstance(output, dict):
-            transformed_output = json.dumps(output, indent=4, ensure_ascii=False)
-        elif output_type == "json" and isinstance(output, pd.DataFrame):
-            transformed_output = output.to_json(orient="records", indent=4)
-            transformed_output = json.loads(transformed_output)
-            transformed_output = json.dumps(
-                transformed_output, ensure_ascii=False, indent=4
-            )
-    else:
-        if isinstance(output, pd.DataFrame):
-            transformed_output = try_parquet_conversion(output)
-        elif isinstance(output, dict):
-            transformed_output = json.dumps(output, indent=4, ensure_ascii=False)
+    if isinstance(output, pd.DataFrame) or (
+        hasattr(output, "__class__") and output.__class__.__name__.endswith("DataFrame")
+    ):
+        transformed_output = try_parquet_conversion(output)
+    elif isinstance(output, dict) or isinstance(output, list):
+        transformed_output = json.dumps(output, indent=4, ensure_ascii=False)
+    elif isinstance(output, StreamChatResponse):
+        transformed_output = json.dumps(
+            output.model_dump(), indent=4, ensure_ascii=False
+        )
+    elif isinstance(output, HtmlResponse):
+        transformed_output = output.value
+    elif isinstance(output, MarkdownResponse):
+        transformed_output = output.value
 
     return transformed_output
 
@@ -127,158 +108,76 @@ def is_generator(output: Any) -> bool:
 
 
 def stream_and_write_and_response(
-    project: Optional[MorphProject],
-    resource: MorphFunctionMetaObject,
-    cell_alias: str,
-    final_state: str,
     output: Any,
     logger: logging.Logger,
-    run_id: str,
-    error: Optional[CliError],
 ) -> Generator[str, None, None]:
     data: List[Dict[str, Any]] = []
     if inspect.isasyncgen(output):
 
         async def process_async_output():
             err = None
-            final_state_ = final_state
-            error_ = error
-            response_data = None
             try:
                 async with redirect_stdout_to_logger_async(logger, logging.INFO):
                     async for chunk in output:
                         dumped_chunk = _dump_and_append_chunk(chunk, data)
                         yield json.dumps(dumped_chunk, ensure_ascii=False)
-                response_data = _convert_stream_response_to_model(data)
-            except Exception as e:
+            except Exception:
                 tb_str = traceback.format_exc()
                 text = f"An error occurred while running the file 💥: {tb_str}"
                 err = text
                 logger.error(f"Error: {text}")
                 click.echo(click.style(text, fg="red"))
-                final_state_ = RunStatus.FAILED.value
-                error_ = CliError(
-                    type="general",
-                    details=str(e),
-                )
-                response_data = None
             finally:
-                finalize_run(
-                    project,
-                    resource,
-                    cell_alias,
-                    final_state_,
-                    response_data,
-                    logger,
-                    run_id,
-                    error_,
-                )
                 if err:
                     raise Exception(err)
-                else:
-                    if sys.platform == "win32":
-                        if len(resource.id.split(":")) > 2:
-                            filepath = (
-                                resource.id.rsplit(":", 1)[0] if resource.id else ""
-                            )
-                        else:
-                            filepath = resource.id if resource.id else ""
-                    else:
-                        filepath = resource.id.split(":")[0]
-                    logger.info(f"Successfully ran file 🎉: {filepath}")
 
         import asyncio
 
         asyncio.run(process_async_output())
     else:
         err = None
-        response_data = None
         try:
             with redirect_stdout_to_logger(logger, logging.INFO):
                 for chunk in output:
                     dumped_chunk = _dump_and_append_chunk(chunk, data)
                     yield json.dumps(dumped_chunk, ensure_ascii=False)
-            response_data = _convert_stream_response_to_model(data)
-        except Exception as e:
+        except Exception:
             tb_str = traceback.format_exc()
             text = f"An error occurred while running the file 💥: {tb_str}"
             err = text
             logger.error(f"Error: {text}")
             click.echo(click.style(text, fg="red"))
-            final_state = RunStatus.FAILED.value
-            error = CliError(
-                type="general",
-                details=str(e),
-            )
-            response_data = None
         finally:
-            finalize_run(
-                project,
-                resource,
-                cell_alias,
-                final_state,
-                response_data,
-                logger,
-                run_id,
-                error,
-            )
             if err:
                 raise Exception(err)
-            else:
-                if sys.platform == "win32":
-                    if len(resource.id.split(":")) > 2:
-                        filepath = resource.id.rsplit(":", 1)[0] if resource.id else ""
-                    else:
-                        filepath = resource.id if resource.id else ""
-                else:
-                    filepath = resource.id.split(":")[0]
-                logger.info(f"Successfully ran file 🎉: {filepath}")
 
 
 def stream_and_write(
-    project: Optional[MorphProject],
     resource: MorphFunctionMetaObject,
-    cell_alias: str,
-    final_state: str,
     output: Any,
     logger: logging.Logger,
-    run_id: str,
-    error: Optional[CliError],
 ) -> None:
     data: List[Dict[str, Any]] = []
-
     if inspect.isasyncgen(output):
 
         async def process_async_output():
-            final_state_ = final_state
-            error_ = error
             response_data = None
             try:
                 async with redirect_stdout_to_logger_async(logger, logging.INFO):
                     async for chunk in output:
                         _dump_and_append_chunk(chunk, data)
                 response_data = _convert_stream_response_to_model(data)
-            except Exception as e:
+            except Exception:
                 tb_str = traceback.format_exc()
                 text = f"An error occurred while running the file 💥: {tb_str}"
                 logger.error(f"Error: {text}")
                 click.echo(click.style(text, fg="red"))
-                final_state_ = RunStatus.FAILED.value
-                error_ = CliError(
-                    type="general",
-                    details=str(e),
-                )
                 response_data = None
             finally:
                 finalize_run(
-                    project,
                     resource,
-                    cell_alias,
-                    final_state_,
                     response_data,
                     logger,
-                    run_id,
-                    error_,
                 )
 
         import asyncio
@@ -291,38 +190,21 @@ def stream_and_write(
                 for chunk in output:
                     _dump_and_append_chunk(chunk, data)
             response_data = _convert_stream_response_to_model(data)
-        except Exception as e:
+        except Exception:
             tb_str = traceback.format_exc()
             text = f"An error occurred while running the file 💥: {tb_str}"
             logger.error(f"Error: {text}")
             click.echo(click.style(text, fg="red"))
-            final_state = RunStatus.FAILED.value
-            error = CliError(
-                type="general",
-                details=str(e),
-            )
             response_data = None
         finally:
             finalize_run(
-                project,
                 resource,
-                cell_alias,
-                final_state,
                 response_data,
                 logger,
-                run_id,
-                error,
             )
 
 
 def convert_run_result(output: Any) -> Any:
-    if output is None:
-        return None
-    elif isinstance(output, str):
-        return MarkdownResponse(output)
-    elif isinstance(output, dict):
-        return pd.DataFrame.from_dict(output, orient="index").T
-
     return output
 
 
@@ -336,92 +218,27 @@ def _dump_and_append_chunk(chunk: Any, data: List[Dict[str, Any]]) -> Any:
     return dumped_chunk
 
 
-def _infer_output_type(output: Any) -> Optional[str]:
-    if isinstance(output, pd.DataFrame) or isinstance(output, bytes):
-        return "dataframe"
-    elif isinstance(output, dict) or isinstance(output, StreamChatResponse):
-        return "json"
-    elif isinstance(output, list):
-        return "visualization"
+def _get_output_paths(output: Any, alias: str) -> List[str]:
+    ext = ".txt"
+    if isinstance(output, MarkdownResponse):
+        ext = ".md"
     elif isinstance(output, HtmlResponse):
-        return "visualization"
-    elif isinstance(output, MarkdownResponse):
-        return "markdown"
-    else:
-        return None
-
-
-def _get_output_paths(
-    project: Optional[MorphProject], resource: MorphFunctionMetaObject
-) -> List[str]:
-    output_paths = default_output_paths()
-    if resource.output_paths and len(resource.output_paths) > 0:
-        output_paths = cast(list, resource.output_paths)
-    output_type = resource.output_type if resource.output_type else None
-
-    # if output_type exists and output_paths is not specified, set default output destination
-    if output_type is not None and len(output_paths) < 1:
-        output_dir = os.path.join(
-            MorphConstant.TMP_MORPH_DIR,
-            resource.name if resource.name else "",
-        )
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        if resource.output_type == "dataframe":
-            output_paths = [os.path.join(output_dir, "result.parquet")]
-        elif resource.output_type == "visualization":
-            output_paths = [
-                os.path.join(output_dir, "result.html"),
-                os.path.join(output_dir, "result.png"),
-            ]
-        elif resource.output_type == "markdown":
-            output_paths = [os.path.join(output_dir, "result.md")]
-        elif resource.output_type == "csv":
-            output_paths = [os.path.join(output_dir, "result.csv")]
-        elif resource.output_type == "json":
-            output_paths = [os.path.join(output_dir, "result.json")]
-
+        ext = ".html"
+    elif isinstance(output, StreamChatResponse):
+        ext = ".stream.json"
+    elif isinstance(output, dict) or isinstance(output, list):
+        ext = ".json"
+    elif isinstance(output, pd.DataFrame):
+        ext = ".parquet"
+    output_paths = default_output_paths(ext, alias)
     return output_paths
 
 
 def _save_output_to_file(
-    project: Optional[MorphProject],
     resource: MorphFunctionMetaObject,
     output: Any,
     logger: logging.Logger,
-    run_id: str,
 ) -> Optional[List[str]]:
-    output_type = (
-        resource.output_type if resource.output_type else _infer_output_type(output)
-    )
-
-    output_paths: List[str] = _get_output_paths(project, resource)
-
-    if isinstance(output, MarkdownResponse):
-        if len(output_paths) > 0:
-            if output_paths[0].endswith("{ext()}"):
-                output_paths = [
-                    output_paths[0].replace("{ext()}", ".md"),
-                ]
-            else:
-                output_paths = [os.path.splitext(output_paths[0])[0] + ".md"]
-    elif isinstance(output, HtmlResponse):
-        if len(output_paths) > 0:
-            if output_paths[0].endswith("{ext()}"):
-                output_paths = [
-                    output_paths[0].replace("{ext()}", ".html"),
-                ]
-            else:
-                output_paths = [os.path.splitext(output_paths[0])[0] + ".html"]
-    elif isinstance(output, StreamChatResponse):
-        if len(output_paths) > 0:
-            if output_paths[0].endswith("{ext()}"):
-                output_paths = [
-                    output_paths[0].replace("{ext()}", ".stream.json"),
-                ]
-            else:
-                output_paths = [os.path.splitext(output_paths[0])[0] + ".stream.json"]
-
     if sys.platform == "win32":
         if len(resource.id.split(":")) > 2:
             path = resource.id.rsplit(":", 1)[0] if resource.id else ""
@@ -433,32 +250,11 @@ def _save_output_to_file(
         alias=resource.name if resource.name else "",
         path=path,
         connection=resource.connection,
-        output_paths=output_paths,
-        output_type=output_type,
+        output_paths=_get_output_paths(output, resource.name if resource.name else ""),
     )
 
-    if isinstance(output, StreamChatResponse):
-        output = json.dumps(output.model_dump(), indent=4, ensure_ascii=False)
-    elif isinstance(output, HtmlResponse):
-        output = output.value
-    elif isinstance(output, MarkdownResponse):
-        output = output.value
-
-    resource_ = resource_.save_output_to_file(run_id, output, logger)
+    resource_ = resource_.save_output_to_file(transform_output(output), logger)
     return resource_.output_paths
-
-
-VISUALIZATION_FORMAT = Literal["png", "html"]
-
-
-def _get_html_from_mpl_image(fig: Any, format: VISUALIZATION_FORMAT = "html") -> str:
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png")
-    buf.seek(0)
-    if format == "png":
-        return base64.b64encode(buf.read()).decode()
-    elif format == "html":
-        return f'<img src="data:image/png;base64,{base64.b64encode(buf.read()).decode()}" />'
 
 
 def _is_openai_chunk(output: Any) -> bool:
