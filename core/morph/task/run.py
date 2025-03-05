@@ -28,7 +28,6 @@ from morph.task.utils.run_backend.output import (
     is_stream,
     stream_and_write,
     stream_and_write_and_response,
-    transform_output,
 )
 from morph.task.utils.run_backend.state import (
     MorphFunctionMetaObject,
@@ -40,7 +39,7 @@ from morph.task.utils.timezone import TimezoneManager
 
 
 class RunTask(BaseTask):
-    def __init__(self, args: Flags, mode: Optional[Literal["cli", "api"]] = "cli"):
+    def __init__(self, args: Flags, mode: Literal["cli", "api"] = "cli"):
         super().__init__(args)
 
         # class state
@@ -184,18 +183,17 @@ class RunTask(BaseTask):
             self.error = "Invalid file type. Please specify a .sql or .py file."
             self.logger.error(self.error)
             self.final_state = RunStatus.FAILED.value
-            self.output_paths = finalize_run(
-                self.resource,
-                None,
-                self.logger,
-                self.run_id,
-            )
+            if self.mode == "cli":
+                self.output_paths = finalize_run(
+                    self.resource,
+                    None,
+                    self.logger,
+                )
             return
 
         if not self.resource.name or not self.resource.id:
             raise FileNotFoundError(f"Invalid metadata: {self.resource}")
 
-        cell = self.resource.name
         # id is formatted as {filename}:{function_name}
         if sys.platform == "win32":
             if len(self.resource.id.split(":")) > 2:
@@ -206,9 +204,11 @@ class RunTask(BaseTask):
                 filepath = self.resource.id if self.resource.id else ""
         else:
             filepath = self.resource.id.split(":")[0]
-        self.logger.info(
-            f"Running {self.ext[1:]} file: {filepath}, variables: {self.vars}"
-        )
+
+        if self.mode == "cli":
+            self.logger.info(
+                f"Running {self.ext[1:]} file: {filepath}, variables: {self.vars}"
+            )
 
         try:
             dag = RunDagArgs(run_id=self.run_id) if self.is_dag else None
@@ -219,6 +219,7 @@ class RunTask(BaseTask):
                 self.logger,
                 dag,
                 self.meta_obj_cache,
+                self.mode,
             )
         except Exception as e:
             if self.is_dag:
@@ -234,27 +235,28 @@ class RunTask(BaseTask):
             self.logger.error(self.error)
             click.echo(click.style(self.error, fg="red"))
             self.final_state = RunStatus.FAILED.value
-            self.output_paths = finalize_run(
-                self.resource,
-                None,
-                self.logger,
-                self.run_id,
-            )
-            if self.mode == "api":
+            if self.mode == "cli":
+                self.output_paths = finalize_run(
+                    self.resource,
+                    None,
+                    self.logger,
+                )
+            elif self.mode == "api":
                 raise Exception(text)
             return
 
         # print preview of the DataFrame
-        if isinstance(output.result, pd.DataFrame):
-            preview = tabulate(
-                output.result.head().values.tolist(),
-                headers=output.result.columns.tolist(),
-                tablefmt="grid",
-                showindex=True,
-            )
-            self.logger.info("DataFrame preview:\n" + preview)
-        else:
-            self.logger.info("Output: " + str(output.result))
+        if self.mode == "cli":
+            if isinstance(output.result, pd.DataFrame):
+                preview = tabulate(
+                    output.result.head().values.tolist(),
+                    headers=output.result.columns.tolist(),
+                    tablefmt="grid",
+                    showindex=True,
+                )
+                self.logger.info("DataFrame preview:\n" + preview)
+            else:
+                self.logger.info("Output: " + str(output.result))
 
         if (
             is_stream(output.result)
@@ -263,28 +265,24 @@ class RunTask(BaseTask):
         ):
             if self.mode == "api":
                 return stream_and_write_and_response(
-                    self.project,
-                    self.resource,
-                    cell,
-                    RunStatus.DONE.value,
-                    transform_output(self.resource, output.result),
+                    output.result,
                     self.logger,
-                    self.run_id,
-                    None,
                 )
             else:
                 stream_and_write(
                     self.resource,
-                    transform_output(self.resource, output.result),
+                    output.result,
                     self.logger,
-                    self.run_id,
                 )
         else:
             self.final_state = RunStatus.DONE.value
-            self.output_paths = finalize_run(
-                self.resource,
-                transform_output(self.resource, output.result),
-                self.logger,
-                self.run_id,
-            )
-        self.logger.info(f"Successfully ran file 🎉: {filepath}")
+            if self.mode == "cli":
+                self.output_paths = finalize_run(
+                    self.resource,
+                    output.result,
+                    self.logger,
+                )
+            else:
+                return output.result
+        if self.mode == "cli":
+            self.logger.info(f"Successfully ran file 🎉: {filepath}")

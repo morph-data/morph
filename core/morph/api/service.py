@@ -1,4 +1,3 @@
-import asyncio
 import io
 import json
 import logging
@@ -33,7 +32,6 @@ from morph.task.resource import PrintResourceTask
 from morph.task.run import RunTask
 from morph.task.utils.morph import find_project_root_dir
 from morph.task.utils.run_backend.errors import MorphFunctionLoadError
-from morph.task.utils.run_backend.execution import execution_cache
 from morph.task.utils.run_backend.state import MorphGlobalContext
 from morph.task.utils.run_backend.types import RunStatus
 
@@ -71,10 +69,10 @@ def run_file_with_type_service(
         ctx.params["RUN_ID"] = f"{int(time.time() * 1000)}"
         ctx.params["DAG"] = input.use_cache if input.use_cache else False
         ctx.params["DATA"] = convert_variables_values(input.variables)
-        task = RunTask(Flags(ctx))
+        task = RunTask(Flags(ctx), "api")
 
     try:
-        task.run()
+        result = task.run()
     except Exception as e:
         raise WarningError(
             ErrorCode.ExecutionError,
@@ -102,42 +100,9 @@ def run_file_with_type_service(
             ErrorCode.ExecutionError,
             ErrorMessage.ExecutionErrorMessage["executionFailed"],
         )
-    output_paths = task.output_paths
-    if not output_paths or len(output_paths) == 0:
-        raise WarningError(
-            ErrorCode.ExecutionError,
-            ErrorMessage.ExecutionErrorMessage["executionFailed"],
-            "output not found",
-        )
-
-    # ------------------------------------------------------------------
-    # After execution, update the global cache
-    # ------------------------------------------------------------------
-    execution_cache.update_cache(input.name, output_paths)
-
-    output_path = output_paths[0]
-    if input.type == "html":
-        if len(output_paths) == 2:
-            if input.type == "html" and not output_path.endswith(".html"):
-                output_path = output_paths[1]
-        elif len(output_paths) == 1:
-            if (
-                input.type == "html"
-                and not output_path.endswith(".html")
-                and not output_path.endswith(".txt")
-            ):
-                raise WarningError(
-                    ErrorCode.ExecutionError,
-                    ErrorMessage.ExecutionErrorMessage["executionFailed"],
-                    "html not found",
-                )
-
-    ext = output_path.split(".")[-1]
 
     try:
-        data = convert_file_output(
-            input.type, output_path, ext, input.limit, input.skip
-        )
+        data = convert_file_output(input.type, result, input.limit, input.skip)
     except Exception:  # noqa
         raise WarningError(
             ErrorCode.ExecutionError,
@@ -181,7 +146,7 @@ def run_file_service(input: RunFileService) -> SuccessResponse:
         ctx.params["RUN_ID"] = run_id
         ctx.params["DAG"] = False
         ctx.params["DATA"] = convert_variables_values(input.variables)
-        task = RunTask(Flags(ctx))
+        task = RunTask(Flags(ctx), "api")
 
     try:
         task.run()
@@ -260,9 +225,7 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
                 if first_chunk:
                     first_chunk = False
                     yield '{"chunks": ['
-                    await asyncio.sleep(0.02)
                 yield c + ","
-                await asyncio.sleep(0.02)
 
             yield "]}"
         except Exception as e:
