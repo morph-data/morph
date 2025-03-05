@@ -94,7 +94,6 @@ def _import_python_file(
 
 
 def _import_sql_file(
-    project: Optional[MorphProject],
     file_path: str,
 ) -> tuple[ScanResult | None, dict[str, Any], MorphFunctionLoadError | None]:
     file = Path(file_path)
@@ -118,8 +117,6 @@ def _import_sql_file(
         data_requirements = []
         name = None
         description = None
-        output_paths = None
-        output_type = None
         result_cache_ttl = None
         kwargs = {}
         if config is not None:
@@ -131,10 +128,6 @@ def _import_sql_file(
                     name = kwargs["alias"]
                 if "description" in kwargs:
                     description = kwargs["description"]
-                if "output_paths" in kwargs:
-                    output_paths = kwargs["output_paths"]
-                if "output_type" in kwargs:
-                    output_type = kwargs["output_type"]
                 if "result_cache_ttl" in kwargs:
                     result_cache_ttl = kwargs["result_cache_ttl"]
         for data in load_data:
@@ -143,10 +136,6 @@ def _import_sql_file(
 
         if name is None:
             name = file.stem
-        if output_paths is None:
-            output_paths = default_output_paths()
-        if output_type is None:
-            output_type = "dataframe"
         if result_cache_ttl is None:
             result_cache_ttl = 0
         sql_contexts.update(
@@ -155,8 +144,9 @@ def _import_sql_file(
                     "id": module_path,
                     "name": name,
                     "description": description,
-                    "output_paths": output_paths,
-                    "output_type": output_type,
+                    "output_paths": default_output_paths(
+                        ext=".parquet", alias=f"{name}"
+                    ),
                     "variables": variables,
                     "data_requirements": data_requirements,
                     "result_cache_ttl": result_cache_ttl,
@@ -226,7 +216,7 @@ def import_files(
                 continue
 
             module_path = file.as_posix()
-            result, context, error = _import_sql_file(project, module_path)
+            result, context, error = _import_sql_file(module_path)
             if result is not None:
                 results.append(result)
                 sql_contexts.update(context)

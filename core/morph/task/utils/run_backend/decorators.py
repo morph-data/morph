@@ -6,8 +6,6 @@ from typing import Any, Callable, List, Literal, Optional, TypeVar
 
 from typing_extensions import ParamSpec
 
-from morph.config.project import default_output_paths
-
 from .state import MorphFunctionMetaObject, MorphGlobalContext
 
 Param = ParamSpec("Param")
@@ -58,8 +56,6 @@ def func(
             description=description,
             variables=variables,
             data_requirements=data_requirements,
-            output_paths=default_output_paths(),
-            output_type=None,
             connection=connection,
             result_cache_ttl=result_cache_ttl,
         )
@@ -122,8 +118,6 @@ def variables(
                         },
                     },
                     data_requirements=meta.data_requirements,
-                    output_paths=meta.output_paths,
-                    output_type=meta.output_type,
                     connection=meta.connection,
                     result_cache_ttl=meta.result_cache_ttl,
                 ),
@@ -145,8 +139,6 @@ def variables(
                         }
                     },
                     data_requirements=None,
-                    output_paths=None,
-                    output_type=None,
                     connection=None,
                     result_cache_ttl=None,
                 ),
@@ -180,8 +172,6 @@ def load_data(
                     title=meta.title,
                     variables=meta.variables,
                     data_requirements=meta.data_requirements + [name],
-                    output_paths=meta.output_paths,
-                    output_type=meta.output_type,
                     connection=meta.connection,
                     result_cache_ttl=meta.result_cache_ttl,
                 ),
@@ -197,8 +187,6 @@ def load_data(
                     title=None,
                     variables=None,
                     data_requirements=[name],
-                    output_paths=None,
-                    output_type=None,
                     connection=None,
                     result_cache_ttl=None,
                 ),
