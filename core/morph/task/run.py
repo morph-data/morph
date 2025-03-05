@@ -28,19 +28,17 @@ from morph.task.utils.run_backend.output import (
     is_stream,
     stream_and_write,
     stream_and_write_and_response,
-    transform_output,
 )
 from morph.task.utils.run_backend.state import (
     MorphFunctionMetaObject,
     MorphFunctionMetaObjectCacheManager,
     MorphGlobalContext,
 )
-from morph.task.utils.run_backend.types import CliError, RunStatus
-from morph.task.utils.timezone import TimezoneManager
+from morph.task.utils.run_backend.types import RunStatus
 
 
 class RunTask(BaseTask):
-    def __init__(self, args: Flags, mode: Optional[Literal["cli", "api"]] = "cli"):
+    def __init__(self, args: Flags, mode: Literal["cli", "api"] = "cli"):
         super().__init__(args)
 
         # class state
@@ -162,103 +160,82 @@ class RunTask(BaseTask):
         self.cell_alias = str(self.resource.name)
         self.logger = get_morph_logger()
 
-        # load .env in project root and set timezone
+        # load .env in project root
         dotenv_path = os.path.join(self.project_root, ".env")
         load_dotenv(dotenv_path)
         env_vars = dotenv_values(dotenv_path)
         for e_key, e_val in env_vars.items():
             os.environ[e_key] = str(e_val)
 
-        desired_tz = os.getenv("TZ")
-        if desired_tz is not None:
-            tz_manager = TimezoneManager()
-            if not tz_manager.is_valid_timezone(desired_tz):
-                self.logger.warning(
-                    "Warning: Invalid TZ value in .env. Falling back to system timezone.",
-                )
-            else:
-                tz_manager.set_timezone(desired_tz)
-
     def run(self) -> Any:
         if self.ext != ".sql" and self.ext != ".py":
             self.error = "Invalid file type. Please specify a .sql or .py file."
             self.logger.error(self.error)
             self.final_state = RunStatus.FAILED.value
-            self.output_paths = finalize_run(
-                self.project,
-                self.resource,
-                self.cell_alias,
-                self.final_state,
-                None,
-                self.logger,
-                self.run_id,
-                CliError(
-                    type="general",
-                    details=self.error,
-                ),
-            )
+            if self.mode == "cli":
+                self.output_paths = finalize_run(
+                    self.resource,
+                    None,
+                    self.logger,
+                )
             return
-        else:
-            if not self.resource.name or not self.resource.id:
-                raise FileNotFoundError(f"Invalid metadata: {self.resource}")
 
-            cell = self.resource.name
-            # id is formatted as {filename}:{function_name}
-            if sys.platform == "win32":
-                if len(self.resource.id.split(":")) > 2:
-                    filepath = (
-                        self.resource.id.rsplit(":", 1)[0] if self.resource.id else ""
-                    )
-                else:
-                    filepath = self.resource.id if self.resource.id else ""
+        if not self.resource.name or not self.resource.id:
+            raise FileNotFoundError(f"Invalid metadata: {self.resource}")
+
+        # id is formatted as {filename}:{function_name}
+        if sys.platform == "win32":
+            if len(self.resource.id.split(":")) > 2:
+                filepath = (
+                    self.resource.id.rsplit(":", 1)[0] if self.resource.id else ""
+                )
             else:
-                filepath = self.resource.id.split(":")[0]
+                filepath = self.resource.id if self.resource.id else ""
+        else:
+            filepath = self.resource.id.split(":")[0]
+
+        if self.mode == "cli":
             self.logger.info(
                 f"Running {self.ext[1:]} file: {filepath}, variables: {self.vars}"
             )
 
-            try:
-                dag = RunDagArgs(run_id=self.run_id) if self.is_dag else None
-                output = run_cell(
-                    self.project,
-                    self.resource,
-                    self.vars,
-                    self.logger,
-                    dag,
-                    self.meta_obj_cache,
+        try:
+            dag = RunDagArgs(run_id=self.run_id) if self.is_dag else None
+            output = run_cell(
+                self.project,
+                self.resource,
+                self.vars,
+                self.logger,
+                dag,
+                self.meta_obj_cache,
+                self.mode,
+            )
+        except Exception as e:
+            if self.is_dag:
+                text = str(e)
+            else:
+                error_txt = (
+                    logging_file_error_exception(e, filepath)
+                    if self.ext == ".py"
+                    else str(e)
                 )
-            except Exception as e:
-                if self.is_dag:
-                    text = str(e)
-                else:
-                    error_txt = (
-                        logging_file_error_exception(e, filepath)
-                        if self.ext == ".py"
-                        else str(e)
-                    )
-                    text = f"An error occurred while running the file 💥: {error_txt}"
-                self.error = text
-                self.logger.error(self.error)
-                click.echo(click.style(self.error, fg="red"))
-                self.final_state = RunStatus.FAILED.value
+                text = f"An error occurred while running the file 💥: {error_txt}"
+            self.error = text
+            self.logger.error(self.error)
+            click.echo(click.style(self.error, fg="red"))
+            self.final_state = RunStatus.FAILED.value
+            if self.mode == "cli":
                 self.output_paths = finalize_run(
-                    self.project,
                     self.resource,
-                    cell,
-                    self.final_state,
                     None,
                     self.logger,
-                    self.run_id,
-                    CliError(
-                        type="general",
-                        details=text,
-                    ),
                 )
-                if self.mode == "api":
-                    raise Exception(text)
-                return
+            elif self.mode == "api":
+                raise Exception(text)
+            return
 
-            # print preview of the DataFrame
+        # print preview of the DataFrame
+        if self.mode == "cli":
             if isinstance(output.result, pd.DataFrame):
                 preview = tabulate(
                     output.result.head().values.tolist(),
@@ -267,44 +244,34 @@ class RunTask(BaseTask):
                     showindex=True,
                 )
                 self.logger.info("DataFrame preview:\n" + preview)
-
-            if (
-                is_stream(output.result)
-                or is_async_generator(output.result)
-                or is_generator(output.result)
-            ):
-                if self.mode == "api":
-                    return stream_and_write_and_response(
-                        self.project,
-                        self.resource,
-                        cell,
-                        RunStatus.DONE.value,
-                        transform_output(self.resource, output.result),
-                        self.logger,
-                        self.run_id,
-                        None,
-                    )
-                else:
-                    stream_and_write(
-                        self.project,
-                        self.resource,
-                        cell,
-                        RunStatus.DONE.value,
-                        transform_output(self.resource, output.result),
-                        self.logger,
-                        self.run_id,
-                        None,
-                    )
             else:
-                self.final_state = RunStatus.DONE.value
-                self.output_paths = finalize_run(
-                    self.project,
-                    self.resource,
-                    cell,
-                    self.final_state,
-                    transform_output(self.resource, output.result),
+                self.logger.info("Output: " + str(output.result))
+
+        if (
+            is_stream(output.result)
+            or is_async_generator(output.result)
+            or is_generator(output.result)
+        ):
+            if self.mode == "api":
+                return stream_and_write_and_response(
+                    output.result,
                     self.logger,
-                    self.run_id,
-                    None,
                 )
+            else:
+                stream_and_write(
+                    self.resource,
+                    output.result,
+                    self.logger,
+                )
+        else:
+            self.final_state = RunStatus.DONE.value
+            if self.mode == "cli":
+                self.output_paths = finalize_run(
+                    self.resource,
+                    output.result,
+                    self.logger,
+                )
+            else:
+                return output.result
+        if self.mode == "cli":
             self.logger.info(f"Successfully ran file 🎉: {filepath}")
