@@ -30,7 +30,7 @@ def load_data(alias: str, variables: Optional[Dict[str, Any]] = None) -> Any:
     if not resource:
         raise MorphApiError(f"Resource {alias} not found.")
 
-    meta_obj_cache = MorphFunctionMetaObjectCacheManager().load_cache(project_root)
+    meta_obj_cache = MorphFunctionMetaObjectCacheManager().get_cache()
 
     vars = variables or {}
     logger = get_morph_logger()

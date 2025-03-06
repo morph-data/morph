@@ -168,104 +168,6 @@ def run_cell(
             ):
                 raise RequestError(f"Variable '{var_name}' is required.")
 
-    # # -------------------------------------------------------------------------
-    # # Use the global _execution_cache. If project.result_cache_ttl is set, apply it.
-    # # project.result_cache_ttl is in SECONDS, so we directly assign it to expiration_seconds.
-    # # -------------------------------------------------------------------------
-    # if project and project.result_cache_ttl and project.result_cache_ttl > 0:
-    #     execution_cache.expiration_seconds = project.result_cache_ttl
-
-    # # Check cache
-    # cache_entry = execution_cache.get_cache(meta_obj.name)
-    # if cache_entry:
-    #     # If valid cache entry, try to load from disk
-    #     if logger and mode == "cli":
-    #         logger.info(f"Running {meta_obj.name} using cached result.")
-
-    #     cache_paths_obj = cache_entry.get("cache_paths", [])
-    #     if not isinstance(cache_paths_obj, list):
-    #         raise ValueError("Invalid cache entry: cache_paths is not a list.")
-
-    #     for path in cache_paths_obj:
-    #         if not os.path.exists(path):
-    #             continue
-    #         ext_ = path.split(".")[-1]
-    #         if ext_ in {"parquet", "csv", "json", "md", "txt", "html"}:
-    #             cached_result = None
-    #             if ext_ == "parquet":
-    #                 cached_result = RunCellResult(result=pd.read_parquet(path))
-    #             elif ext_ == "csv":
-    #                 cached_result = RunCellResult(result=pd.read_csv(path))
-    #             elif ext_ == "json":
-    #                 json_dict = json.loads(open(path, "r").read())
-    #                 if not MorphChatStreamChunk.is_chat_stream_chunk_json(json_dict):
-    #                     cached_result = RunCellResult(
-    #                         result=pd.read_json(path, orient="records")
-    #                     )
-    #             elif ext_ in {"md", "txt"}:
-    #                 cached_result = RunCellResult(
-    #                     result=MarkdownResponse(open(path, "r").read())
-    #                 )
-    #             elif ext_ == "html":
-    #                 cached_result = RunCellResult(
-    #                     result=HtmlResponse(open(path, "r").read())
-    #                 )
-    #             if cached_result:
-    #                 return cached_result
-
-    # # ------------------------------------------------------------------
-    # # Legacy file-based cache logic
-    # # ------------------------------------------------------------------
-    # cache_ttl = (
-    #     meta_obj.result_cache_ttl or (project.result_cache_ttl if project else 0) or 0
-    # )
-    # if project and cache_ttl > 0 and cached_cell and is_cache_valid:
-    #     cache_outputs = default_output_paths(meta_obj.id, meta_obj.name)
-    #     if len(cache_outputs) > 1:
-    #         html_path = next((x for x in cache_outputs if x.endswith(".html")), None)
-    #         if html_path and os.path.exists(html_path):
-    #             if logger and mode == "cli":
-    #                 logger.info(
-    #                     f"Running {meta_obj.name} using existing file-based cache (legacy)."
-    #                 )
-    #             return RunCellResult(result=HtmlResponse(open(html_path, "r").read()))
-    #     if len(cache_outputs) > 0:
-    #         cache_path = cache_outputs[0]
-    #         cache_path_ext = cache_path.split(".")[-1]
-    #         if cache_path_ext in {
-    #             "parquet",
-    #             "csv",
-    #             "json",
-    #             "md",
-    #             "txt",
-    #             "html",
-    #         } and os.path.exists(cache_path):
-    #             cached_result = None
-    #             if cache_path_ext == "parquet":
-    #                 cached_result = RunCellResult(result=pd.read_parquet(cache_path))
-    #             elif cache_path_ext == "csv":
-    #                 cached_result = RunCellResult(result=pd.read_csv(cache_path))
-    #             elif cache_path_ext == "json":
-    #                 json_dict = json.loads(open(cache_path, "r").read())
-    #                 if not MorphChatStreamChunk.is_chat_stream_chunk_json(json_dict):
-    #                     cached_result = RunCellResult(
-    #                         result=pd.read_json(cache_path, orient="records")
-    #                     )
-    #             elif cache_path_ext == "md" or cache_path_ext == "txt":
-    #                 cached_result = RunCellResult(
-    #                     result=MarkdownResponse(open(cache_path, "r").read())
-    #                 )
-    #             elif cache_path_ext == "html":
-    #                 cached_result = RunCellResult(
-    #                     result=HtmlResponse(open(cache_path, "r").read())
-    #                 )
-    #             if cached_result:
-    #                 if logger and mode == "cli":
-    #                     logger.info(
-    #                         f"{meta_obj.name} using existing file-based cache (legacy)."
-    #                     )
-    #                 return cached_result
-
     # ------------------------------------------------------------------
     # Actual execution
     # ------------------------------------------------------------------
@@ -395,7 +297,6 @@ def _regist_sql_data_requirements(resource: MorphFunctionMetaObject) -> List[str
             variables=resource.variables,
             data_requirements=load_data,
             connection=resource.connection,
-            result_cache_ttl=resource.result_cache_ttl,
         )
         context.update_meta_object(filepath, meta)
 

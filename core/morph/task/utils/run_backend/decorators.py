@@ -27,7 +27,6 @@ def _get_morph_function_id(func: Callable) -> str:
 def func(
     name: str | None = None,
     description: str | None = None,
-    result_cache_ttl: Optional[int] = None,
     alias: str | None = None,
     **kwargs: dict[str, Any],
 ) -> Callable[[Callable[Param, RetType]], Callable[Param, RetType]]:
@@ -57,7 +56,6 @@ def func(
             variables=variables,
             data_requirements=data_requirements,
             connection=connection,
-            result_cache_ttl=result_cache_ttl,
         )
         context.update_meta_object(fid, meta_obj)
 
@@ -119,7 +117,6 @@ def variables(
                     },
                     data_requirements=meta.data_requirements,
                     connection=meta.connection,
-                    result_cache_ttl=meta.result_cache_ttl,
                 ),
             )
         else:
@@ -140,7 +137,6 @@ def variables(
                     },
                     data_requirements=None,
                     connection=None,
-                    result_cache_ttl=None,
                 ),
             )
 
@@ -173,7 +169,6 @@ def load_data(
                     variables=meta.variables,
                     data_requirements=meta.data_requirements + [name],
                     connection=meta.connection,
-                    result_cache_ttl=meta.result_cache_ttl,
                 ),
             )
         else:
@@ -188,7 +183,6 @@ def load_data(
                     variables=None,
                     data_requirements=[name],
                     connection=None,
-                    result_cache_ttl=None,
                 ),
             )
 

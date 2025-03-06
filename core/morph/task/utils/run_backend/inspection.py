@@ -117,7 +117,6 @@ def _import_sql_file(
         data_requirements = []
         name = None
         description = None
-        result_cache_ttl = None
         kwargs = {}
         if config is not None:
             if "kwargs" in config:
@@ -128,16 +127,12 @@ def _import_sql_file(
                     name = kwargs["alias"]
                 if "description" in kwargs:
                     description = kwargs["description"]
-                if "result_cache_ttl" in kwargs:
-                    result_cache_ttl = kwargs["result_cache_ttl"]
         for data in load_data:
             if "args" in data:
                 data_requirements.extend(data["args"])
 
         if name is None:
             name = file.stem
-        if result_cache_ttl is None:
-            result_cache_ttl = 0
         sql_contexts.update(
             {
                 module_path: {
@@ -149,7 +144,6 @@ def _import_sql_file(
                     ),
                     "variables": variables,
                     "data_requirements": data_requirements,
-                    "result_cache_ttl": result_cache_ttl,
                     **kwargs,
                 },
             }

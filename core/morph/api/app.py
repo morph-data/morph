@@ -69,7 +69,7 @@ def custom_compile_logic():
         )
         return response
     else:
-        cache = MorphFunctionMetaObjectCacheManager().load_cache(project_root)
+        cache = MorphFunctionMetaObjectCacheManager().get_cache()
         if cache is not None and len(cache.items) > 0:
             api_description = f"""{Fore.MAGENTA}🚀 The endpoints generated are as follows.{Style.RESET_ALL}
 {Fore.MAGENTA}You can access your Python functions and SQL over the APIs.

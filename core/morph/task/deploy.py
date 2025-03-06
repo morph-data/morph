@@ -1,11 +1,9 @@
 import os
 import re
 import select
-import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path
 from typing import List, Optional
 
 import click
@@ -87,8 +85,6 @@ class DeployTask(BaseTask):
 
         # Frontend and backend settings
         self.frontend_dir = initialize_frontend_dir(self.project_root)
-        self.backend_template_dir = os.path.join(Path(__file__).resolve().parents[2])
-        self.backend_dir = os.path.join(self.project_root, ".morph/core")
 
         # Docker settings
         self.image_name = f"{os.path.basename(self.project_root)}:latest"
@@ -365,14 +361,6 @@ class DeployTask(BaseTask):
 
         click.echo(click.style("Building backend...", fg="blue"))
         try:
-            # Copy the backend template
-            if os.path.exists(self.backend_dir):
-                shutil.rmtree(self.backend_dir)  # Remove existing backend directory
-            os.makedirs(self.backend_dir, exist_ok=True)
-            shutil.copytree(
-                self.backend_template_dir, self.backend_dir, dirs_exist_ok=True
-            )
-
             # Compile the morph project
             subprocess.run(
                 ["morph", "compile", "--force"], cwd=self.project_root, check=True
