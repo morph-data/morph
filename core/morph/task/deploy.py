@@ -260,6 +260,61 @@ class DeployTask(BaseTask):
                     click.style(f"Error exporting requirements.txt: {str(e)}", fg="red")
                 )
                 sys.exit(1)
+        elif self.package_manager == "uv":
+            uv_project_file = os.path.join(self.project_root, "pyproject.toml")
+            requirements_file = os.path.join(self.project_root, "requirements.txt")
+
+            missing_files = [f for f in [uv_project_file] if not os.path.exists(f)]
+            if missing_files:
+                click.echo(
+                    click.style(
+                        f"Error: Missing uv configuration files: {missing_files}",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+
+            # Check if 'morph-data' is listed in pyproject.yoml
+            with open(uv_project_file, "r") as f:
+                uv_project_content = f.read()
+            if "morph-data" not in uv_project_content:
+                click.echo(
+                    click.style(
+                        "Error: 'morph-data' is not listed in 'pyproject.toml'. Please add it.",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+
+            # Generate requirements.txt using uv export
+            click.echo(
+                click.style(
+                    "Exporting requirements.txt from uv environment...", fg="blue"
+                )
+            )
+            try:
+                subprocess.run(
+                    [
+                        "uv",
+                        "pip",
+                        "compile",
+                        "pyproject.toml",
+                        "-o",
+                        requirements_file,
+                    ],
+                    check=True,
+                )
+                click.echo(
+                    click.style(
+                        f"'requirements.txt' generated successfully at: {requirements_file}",
+                        fg="green",
+                    )
+                )
+            except subprocess.CalledProcessError as e:
+                click.echo(
+                    click.style(f"Error exporting requirements.txt: {str(e)}", fg="red")
+                )
+                sys.exit(1)
         else:
             click.echo(
                 click.style(
