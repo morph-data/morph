@@ -1,5 +1,6 @@
 import importlib.metadata
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -200,12 +201,12 @@ class NewTask(BaseTask):
                 if self.is_development:
                     branch = self._get_current_git_branch() or "develop"
                     morph_data_dep = (
-                        f"git+https://github.com/morph-data/morph.git@{branch}#egg=morph-data"
+                        "morph-data @ git+https://github.com/morph-data/morph.git@%s#egg=morph-data"
                         % branch
                     )
                 else:
                     if morph_data_version:
-                        morph_data_dep = f'"morph-data={morph_data_version}"'
+                        morph_data_dep = f"morph-data=={morph_data_version}"
                     else:
                         morph_data_dep = "morph-data"
 
@@ -392,7 +393,22 @@ build-backend = "poetry.core.masonry.api"
         morph_data_dependency: str,
     ) -> str:
         author = self._get_git_author_info()
-        authors_line = f'authors = ["{author}"]\n' if author else ""
+        if author:
+            match = re.match(r"(?P<name>[^<]+)\s*<(?P<email>[^>]+)>", author)
+            if match:
+                name = match.group("name").strip()
+                email = match.group("email").strip()
+                authors_line = f'authors = [{{ name = "{name}", email = "{email}" }}]\n'
+            else:
+                authors_line = f'authors = [{{ name = "{author}" }}]\n'
+        else:
+            authors_line = ""
+
+        metadata_section = (
+            "\n[tool.hatch.metadata]\nallow-direct-references = true\n"
+            if self.is_development
+            else ""
+        )
 
         return f"""[project]
 name = "{project_name}"
@@ -407,4 +423,7 @@ dependencies = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-"""
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+{metadata_section}"""
