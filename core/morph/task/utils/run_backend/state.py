@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import copy
-import json
-import os
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing_extensions import Self
 
 from morph.api.cloud.types import UserInfo
@@ -33,12 +31,7 @@ class MorphFunctionMetaObject(BaseModel):
     title: Optional[str] = None
     variables: Optional[Dict[str, Any]] = {}
     data_requirements: Optional[List[str]] = []
-    output_paths: Optional[List[str]] = []
-    output_type: Optional[
-        Literal["dataframe", "csv", "visualization", "markdown", "json"]
-    ] = None
     connection: Optional[str] = None
-    result_cache_ttl: Optional[int] = Field(default=0)
 
 
 class MorphFunctionMetaObjectCacheItem(BaseModel):
@@ -70,37 +63,11 @@ class MorphFunctionMetaObjectCacheManager:
             cls._instance._cache = None
         return cls._instance
 
-    def load_cache(self, project_root: str) -> MorphFunctionMetaObjectCache | None:
-        if self._cache:
-            return self._cache
-
-        cache_path = self._cache_path(project_root)
-        if not Path(cache_path).exists():
-            return None
-
-        with open(cache_path, "r") as f:
-            data = json.load(f)
-
-        self._cache = MorphFunctionMetaObjectCache.model_validate(data)
-        return self._cache
-
-    def dump_cache(self, cache: MorphFunctionMetaObjectCache) -> None:
-        self._cache = cache
-
-        cache_path = self._cache_path(self._cache.directory)
-        if os.access(self._cache.directory, os.W_OK):
-            if not Path(cache_path).parent.exists():
-                Path(cache_path).parent.mkdir(parents=True)
-
-            with open(cache_path, "w") as f:
-                json.dump(self._cache.model_dump(), f, indent=2)
-
     def get_cache(self) -> MorphFunctionMetaObjectCache | None:
         return self._cache
 
-    @staticmethod
-    def _cache_path(directory: str) -> str:
-        return f"{directory}/.morph/meta.json"
+    def set_cache(self, cache: MorphFunctionMetaObjectCache) -> None:
+        self._cache = cache
 
 
 class MorphGlobalContext:
@@ -161,12 +128,7 @@ class MorphGlobalContext:
                 data_requirements=(
                     value["data_requirements"] if "data_requirements" in value else []
                 ),
-                output_paths=value["output_paths"] if "output_paths" in value else [],
-                output_type=value["output_type"] if "output_type" in value else None,
                 connection=value["connection"] if "connection" in value else None,
-                result_cache_ttl=(
-                    value["result_cache_ttl"] if "result_cache_ttl" in value else None
-                ),
             )
             self.update_meta_object(key, meta_obj)
 
@@ -186,7 +148,7 @@ class MorphGlobalContext:
         if cwd not in sys.path:
             sys.path.append(cwd)
 
-        cache = MorphFunctionMetaObjectCacheManager().load_cache(directory)
+        cache = MorphFunctionMetaObjectCacheManager().get_cache()
         if cache is None:
             errors = self.load(directory)
             if len(errors) == 0:
@@ -228,7 +190,7 @@ class MorphGlobalContext:
             self.dump()
             if len(errors) < 1:
                 return errors
-            cache_ = MorphFunctionMetaObjectCacheManager().load_cache(directory)
+            cache_ = MorphFunctionMetaObjectCacheManager().get_cache()
             if cache_ is not None:
                 cache = cache_
 
@@ -256,7 +218,7 @@ class MorphGlobalContext:
                     category=MorphFunctionLoadErrorCategory.IMPORT_ERROR,
                     file_path="",
                     name=target_name,
-                    error="Not found",
+                    error="Alias not found",
                 )
             ]
 
@@ -271,7 +233,7 @@ class MorphGlobalContext:
                     return errors
             _, error = _import_python_file(target_item.file_path)
         elif suffix == "sql":
-            _, context, error = _import_sql_file(project, target_item.file_path)
+            _, context, error = _import_sql_file(target_item.file_path)
             for key, value in context.items():
                 meta = MorphFunctionMetaObject(
                     id=value["id"] if "id" in value else None,
@@ -287,18 +249,7 @@ class MorphGlobalContext:
                         if "data_requirements" in value
                         else []
                     ),
-                    output_paths=(
-                        value["output_paths"] if "output_paths" in value else []
-                    ),
-                    output_type=(
-                        value["output_type"] if "output_type" in value else None
-                    ),
                     connection=value["connection"] if "connection" in value else None,
-                    result_cache_ttl=(
-                        value["result_cache_ttl"]
-                        if "result_cache_ttl" in value
-                        else None
-                    ),
                 )
                 self.update_meta_object(key, meta)
                 for data_requirement in target_item.spec.data_requirements or []:
@@ -361,7 +312,7 @@ class MorphGlobalContext:
             items=cache_items,
             errors=scan.errors,
         )
-        MorphFunctionMetaObjectCacheManager().dump_cache(cache)
+        MorphFunctionMetaObjectCacheManager().set_cache(cache)
 
         return cache
 
@@ -394,15 +345,8 @@ class MorphGlobalContext:
                     + (obj.data_requirements or [])
                 )
             )
-            current_obj.output_paths = list(
-                set((current_obj.output_paths or []) + (obj.output_paths or []))
-            )
-            current_obj.output_type = current_obj.output_type or obj.output_type
             current_obj.connection = current_obj.connection or obj.connection
             current_obj.title = current_obj.title or obj.title
-            current_obj.result_cache_ttl = (
-                current_obj.result_cache_ttl or obj.result_cache_ttl
-            )
 
     def search_meta_object(self, fid: str) -> MorphFunctionMetaObject | None:
         for obj in self.__meta_objects:

@@ -80,25 +80,20 @@ def _import_python_file(
     try:
         spec.loader.exec_module(module)
     except Exception as e:
-        if isinstance(e, SyntaxError):
-            return None, MorphFunctionLoadError(
-                category=MorphFunctionLoadErrorCategory.INVALID_SYNTAX,
-                file_path=module_path,
-                name=module_name,
-                error=f"Syntax error: {e}",
-            )
+        import traceback
+
+        error_message = "".join(traceback.format_exception(type(e), e, e.__traceback__))
         return None, MorphFunctionLoadError(
             category=MorphFunctionLoadErrorCategory.IMPORT_ERROR,
             file_path=module_path,
             name=module_name,
-            error=f"Fail to evaluate module: {e}",
+            error=error_message,
         )
 
     return ScanResult(file_path=module_path, checksum=get_checksum(file)), None
 
 
 def _import_sql_file(
-    project: Optional[MorphProject],
     file_path: str,
 ) -> tuple[ScanResult | None, dict[str, Any], MorphFunctionLoadError | None]:
     file = Path(file_path)
@@ -122,9 +117,6 @@ def _import_sql_file(
         data_requirements = []
         name = None
         description = None
-        output_paths = None
-        output_type = None
-        result_cache_ttl = None
         kwargs = {}
         if config is not None:
             if "kwargs" in config:
@@ -135,35 +127,23 @@ def _import_sql_file(
                     name = kwargs["alias"]
                 if "description" in kwargs:
                     description = kwargs["description"]
-                if "output_paths" in kwargs:
-                    output_paths = kwargs["output_paths"]
-                if "output_type" in kwargs:
-                    output_type = kwargs["output_type"]
-                if "result_cache_ttl" in kwargs:
-                    result_cache_ttl = kwargs["result_cache_ttl"]
         for data in load_data:
             if "args" in data:
                 data_requirements.extend(data["args"])
 
         if name is None:
             name = file.stem
-        if output_paths is None:
-            output_paths = default_output_paths()
-        if output_type is None:
-            output_type = "dataframe"
-        if result_cache_ttl is None:
-            result_cache_ttl = 0
         sql_contexts.update(
             {
                 module_path: {
                     "id": module_path,
                     "name": name,
                     "description": description,
-                    "output_paths": output_paths,
-                    "output_type": output_type,
+                    "output_paths": default_output_paths(
+                        ext=".parquet", alias=f"{name}"
+                    ),
                     "variables": variables,
                     "data_requirements": data_requirements,
-                    "result_cache_ttl": result_cache_ttl,
                     **kwargs,
                 },
             }
@@ -230,7 +210,7 @@ def import_files(
                 continue
 
             module_path = file.as_posix()
-            result, context, error = _import_sql_file(project, module_path)
+            result, context, error = _import_sql_file(module_path)
             if result is not None:
                 results.append(result)
                 sql_contexts.update(context)

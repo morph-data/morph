@@ -1,11 +1,15 @@
+import importlib.util
+import logging
 import os
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, AsyncGenerator
 
 import uvicorn
+from colorama import Fore, Style
 from fastapi import Depends, FastAPI
+from fastapi.concurrency import asynccontextmanager
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from inertia import (
@@ -20,15 +24,101 @@ from inertia import (
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from morph.api.error import ApiBaseError, InternalError
+from morph.api.error import ApiBaseError, InternalError, render_error_html
 from morph.api.handler import router
+from morph.api.plugin import plugin_app
+from morph.task.utils.morph import find_project_root_dir
+from morph.task.utils.run_backend.state import (
+    MorphFunctionMetaObjectCacheManager,
+    MorphGlobalContext,
+)
 
 # configuration values
+
+# logger
+logger = logging.getLogger("uvicorn")
+logger.setLevel(logging.INFO)
 
 # set true to MORPH_LOCAL_DEV_MODE to use local frontend server
 is_local_dev_mode = True if os.getenv("MORPH_LOCAL_DEV_MODE") == "true" else False
 
-app = FastAPI()
+
+def custom_compile_logic():
+    logger.info("Compiling python and sql files...")
+    project_root = find_project_root_dir()
+    context = MorphGlobalContext.get_instance()
+    errors = context.load(project_root)
+    if len(errors) > 0:
+        error_message = "\n---\n".join(
+            [
+                f"{Fore.RED}{error.error.replace(chr(10), f'{Style.RESET_ALL}{chr(10)}{Fore.RED}')}{Style.RESET_ALL}"
+                for error in errors
+            ]
+        )
+        logger.error(
+            f"""
+{Fore.RED}Compilation failed.{Style.RESET_ALL}
+
+{Fore.RED}Errors:{Style.RESET_ALL}
+{error_message}
+"""
+        )
+        response = HTMLResponse(
+            content=render_error_html([error.error for error in errors]),
+            status_code=500,
+        )
+        return response
+    else:
+        cache = MorphFunctionMetaObjectCacheManager().get_cache()
+        if cache is not None and len(cache.items) > 0:
+            api_description = f"""{Fore.MAGENTA}🚀 The endpoints generated are as follows.{Style.RESET_ALL}
+{Fore.MAGENTA}You can access your Python functions and SQL over the APIs.
+
+{Fore.MAGENTA}📕 Specification
+{Fore.MAGENTA}[POST] /cli/run/{{alias}}/{{html,json}}
+{Fore.MAGENTA}- Return the result as HTML or JSON. Please specify the types from "html", "json".
+{Fore.MAGENTA}[POST] /cli/run-stream/{{alias}}
+{Fore.MAGENTA}- Return the result as a stream. You need to use yield to return the result.
+"""
+            sql_api_description = ""
+            python_api_description = ""
+            for item in cache.items:
+                if item.file_path.endswith(".sql"):
+                    sql_api_description += (
+                        f"{Fore.CYAN}- [POST] /cli/run/{item.spec.name}/{{json}}\n"
+                    )
+                else:
+                    python_api_description += (
+                        f"{Fore.CYAN}- [POST] /cli/run/{item.spec.name}/{{html,json}}\n"
+                    )
+                    python_api_description += (
+                        f"{Fore.CYAN}- [POST] /cli/run-stream/{item.spec.name}\n"
+                    )
+            api_description += f"""
+[SQL API]
+{sql_api_description}
+[Python API]
+{python_api_description}"""
+            logger.info(api_description)
+        logger.info("🎉 Compilation completed.")
+    return
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # startup event
+    if os.environ.get("RUN_MAIN", "true") == "true" and is_local_dev_mode:
+        error_response = custom_compile_logic()
+        if error_response is not None:
+            app.middleware_stack = error_response
+            yield
+            return
+    yield
+    # shutdown event
+    logger.info("Shutting down...")
+
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key="secret_key")
 app.add_exception_handler(
     InertiaVersionConflictException,
@@ -144,6 +234,31 @@ async def health_check():
 
 
 app.include_router(router)
+
+
+def import_plugins():
+    plugin_dir = Path(os.getcwd()) / "src/plugin"
+    if plugin_dir.exists():
+        for file in plugin_dir.glob("**/*.py"):
+            if (
+                file.stem.startswith("__") or file.stem.startswith(".")
+            ) or file.is_dir():
+                continue
+            module_name = file.stem
+            module_path = file.as_posix()
+            spec = importlib.util.spec_from_file_location(module_name, module_path)
+            if spec is None or spec.loader is None:
+                continue
+            module = importlib.util.module_from_spec(spec)
+            try:
+                spec.loader.exec_module(module)
+            except Exception:  # noqa
+                continue
+
+    app.mount("/api/plugin", plugin_app)
+
+
+import_plugins()
 
 
 @app.get("/morph", response_model=None)

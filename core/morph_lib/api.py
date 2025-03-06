@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import cast
 
-import urllib3
 from morph_lib.error import MorphApiError
-from urllib3.exceptions import InsecureRequestWarning
 
 from morph.api.cloud.client import MorphApiClient, MorphApiKeyClientImpl
 from morph.task.utils.connection import (
@@ -22,9 +20,6 @@ from morph.task.utils.connection import (
     SalesforceConnectionOAuth,
     StripeConnectionOAuth,
 )
-
-urllib3.disable_warnings(InsecureRequestWarning)
-
 
 # ===============================================
 #

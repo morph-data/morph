@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List
 
 
 class ExecutionCache:
@@ -46,31 +46,6 @@ class ExecutionCache:
             "last_executed_at": current_time,
             "cache_paths": cache_paths,
         }
-
-    def get_cache(self, function_name: str) -> Optional[dict[str, object]]:
-        """
-        Retrieve cache data for a specific function. Automatically invalidates expired cache.
-        If expiration_seconds == 0, always return None (no caching).
-        """
-        if self.expiration_seconds == 0:
-            return None  # Caching is disabled
-
-        cache_entry = self.cache.get(function_name)
-        if not cache_entry:
-            return None
-
-        last_executed_at = cache_entry["last_executed_at"]
-        if not isinstance(last_executed_at, str):
-            raise ValueError("Invalid cache entry: last_executed_at is not a string")
-
-        last_executed_time = datetime.fromisoformat(last_executed_at)
-        if datetime.now() - last_executed_time > timedelta(
-            seconds=self.expiration_seconds
-        ):
-            self.clear_cache(function_name)
-            return None
-
-        return cache_entry
 
     def clear_cache(self, function_name: str) -> None:
         """

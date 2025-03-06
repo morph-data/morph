@@ -1,4 +1,29 @@
 # Morph config files and directories
-.gitconifg
 .morph
+
+# Node.js
 node_modules
+
+# Python
+__pycache__
+.pytest_cache/
+
+# Virtual environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables
+.env
+
+# IDE / Editor directories
+.vscode/
+.idea/
+
+# Git
+.gitconfig
+
+# OS
+.DS_Store

@@ -1,4 +1,3 @@
 default_connection: DUCKDB
-result_cache_ttl: 0
 source_paths:
 - src

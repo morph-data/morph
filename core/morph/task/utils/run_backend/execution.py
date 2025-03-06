@@ -2,26 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import logging
 import os
 import sys
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, List, Literal, Optional, Union
 
 import pandas as pd
 from jinja2 import BaseLoader, Environment
 from morph_lib.error import RequestError
-from morph_lib.types import HtmlResponse, MarkdownResponse, MorphChatStreamChunk
 from pydantic import BaseModel
 
-from morph.config.project import MorphProject, default_output_paths
+from morph.config.project import MorphProject
 from morph.task.utils.connection import Connection, ConnectionYaml, DatabaseConnection
 from morph.task.utils.connections.connector import Connector
-from morph.task.utils.logging import (
-    get_morph_logger,
-    redirect_stdout_to_logger,
-    redirect_stdout_to_logger_async,
-)
+from morph.task.utils.logging import get_morph_logger
 from morph.task.utils.run_backend.errors import logging_file_error_exception
 from morph.task.utils.run_backend.output import (
     convert_run_result,
@@ -30,9 +24,7 @@ from morph.task.utils.run_backend.output import (
     is_generator,
     is_stream,
     stream_and_write,
-    transform_output,
 )
-from morph.task.utils.run_backend.types import CliError, RunStatus
 
 from .cache import ExecutionCache
 from .state import (
@@ -63,6 +55,7 @@ def run_cell(
     logger: logging.Logger | None = None,
     dag: Optional[RunDagArgs] = None,
     meta_obj_cache: Optional[MorphFunctionMetaObjectCache] = None,
+    mode: Literal["cli", "api"] = "api",
 ) -> RunCellResult:
     context = MorphGlobalContext.get_instance()
 
@@ -78,8 +71,8 @@ def run_cell(
         raise ValueError(f"Invalid metadata: {meta_obj}")
 
     # Attempt to get cached cell from meta_obj_cache
-    cached_cell = meta_obj_cache.find_by_name(meta_obj.name) if meta_obj_cache else None
-    is_cache_valid = True
+    # cached_cell = meta_obj_cache.find_by_name(meta_obj.name) if meta_obj_cache else None
+    # is_cache_valid = True
 
     # If SQL, register data requirements
     ext = meta_obj.id.split(".")[-1]
@@ -100,22 +93,13 @@ def run_cell(
 
         if dag:
             required_data_result = _run_cell_with_dag(
-                project,
-                required_meta_obj,
-                vars,
-                dag,
-                meta_obj_cache,
+                project, required_meta_obj, vars, dag, meta_obj_cache, mode
             )
         else:
             required_data_result = run_cell(
-                project,
-                required_meta_obj,
-                vars,
-                logger,
-                None,
-                meta_obj_cache,
+                project, required_meta_obj, vars, logger, None, meta_obj_cache, mode
             )
-        is_cache_valid = required_data_result.is_cache_valid or True
+        # is_cache_valid = required_data_result.is_cache_valid or True
         context._add_data(data_name, required_data_result.result)
 
     # register variables to context
@@ -184,113 +168,14 @@ def run_cell(
             ):
                 raise RequestError(f"Variable '{var_name}' is required.")
 
-    # -------------------------------------------------------------------------
-    # Use the global _execution_cache. If project.result_cache_ttl is set, apply it.
-    # project.result_cache_ttl is in SECONDS, so we directly assign it to expiration_seconds.
-    # -------------------------------------------------------------------------
-    if project and project.result_cache_ttl and project.result_cache_ttl > 0:
-        execution_cache.expiration_seconds = project.result_cache_ttl
-
-    # Check cache
-    cache_entry = execution_cache.get_cache(meta_obj.name)
-    if cache_entry:
-        # If valid cache entry, try to load from disk
-        if logger:
-            logger.info(f"Running {meta_obj.name} using cached result.")
-
-        cache_paths_obj = cache_entry.get("cache_paths", [])
-        if not isinstance(cache_paths_obj, list):
-            raise ValueError("Invalid cache entry: cache_paths is not a list.")
-
-        for path in cache_paths_obj:
-            if not os.path.exists(path):
-                continue
-            ext_ = path.split(".")[-1]
-            if ext_ in {"parquet", "csv", "json", "md", "txt", "html", "png"}:
-                cached_result = None
-                if ext_ == "parquet":
-                    cached_result = RunCellResult(result=pd.read_parquet(path))
-                elif ext_ == "csv":
-                    cached_result = RunCellResult(result=pd.read_csv(path))
-                elif ext_ == "json":
-                    json_dict = json.loads(open(path, "r").read())
-                    if not MorphChatStreamChunk.is_chat_stream_chunk_json(json_dict):
-                        cached_result = RunCellResult(
-                            result=pd.read_json(path, orient="records")
-                        )
-                elif ext_ in {"md", "txt"}:
-                    cached_result = RunCellResult(
-                        result=MarkdownResponse(open(path, "r").read())
-                    )
-                elif ext_ == "html":
-                    cached_result = RunCellResult(
-                        result=HtmlResponse(open(path, "r").read())
-                    )
-                if cached_result:
-                    return cached_result
-
-    # ------------------------------------------------------------------
-    # Legacy file-based cache logic
-    # ------------------------------------------------------------------
-    cache_ttl = (
-        meta_obj.result_cache_ttl or (project.result_cache_ttl if project else 0) or 0
-    )
-    if project and cache_ttl > 0 and cached_cell and is_cache_valid:
-        cache_outputs = default_output_paths()
-        if len(cache_outputs) > 1:
-            html_path = next((x for x in cache_outputs if x.endswith(".html")), None)
-            if html_path and os.path.exists(html_path):
-                if logger:
-                    logger.info(
-                        f"Running {meta_obj.name} using existing file-based cache (legacy)."
-                    )
-                return RunCellResult(result=HtmlResponse(open(html_path, "r").read()))
-        if len(cache_outputs) > 0:
-            cache_path = cache_outputs[0]
-            cache_path_ext = cache_path.split(".")[-1]
-            if cache_path_ext in {
-                "parquet",
-                "csv",
-                "json",
-                "md",
-                "txt",
-                "html",
-                "png",
-            } and os.path.exists(cache_path):
-                cached_result = None
-                if cache_path_ext == "parquet":
-                    cached_result = RunCellResult(result=pd.read_parquet(cache_path))
-                elif cache_path_ext == "csv":
-                    cached_result = RunCellResult(result=pd.read_csv(cache_path))
-                elif cache_path_ext == "json":
-                    json_dict = json.loads(open(cache_path, "r").read())
-                    if not MorphChatStreamChunk.is_chat_stream_chunk_json(json_dict):
-                        cached_result = RunCellResult(
-                            result=pd.read_json(cache_path, orient="records")
-                        )
-                elif cache_path_ext == "md" or cache_path_ext == "txt":
-                    cached_result = RunCellResult(
-                        result=MarkdownResponse(open(cache_path, "r").read())
-                    )
-                elif cache_path_ext == "html":
-                    cached_result = RunCellResult(
-                        result=HtmlResponse(open(cache_path, "r").read())
-                    )
-                if cached_result:
-                    if logger:
-                        logger.info(
-                            f"{meta_obj.name} using existing file-based cache (legacy)."
-                        )
-                    return cached_result
-
     # ------------------------------------------------------------------
     # Actual execution
     # ------------------------------------------------------------------
     if ext == "sql":
-        if logger:
+        if logger and mode == "cli":
             logger.info(f"Formatting SQL file: {meta_obj.id} with variables: {vars}")
         sql_text = _fill_sql(meta_obj, vars)
-        result_df = _run_sql(project, meta_obj, sql_text, logger)
+        result_df = _run_sql(project, meta_obj, sql_text, logger, mode)
         run_cell_result = RunCellResult(result=result_df, is_cache_valid=False)
     else:
         if not meta_obj.function:
@@ -312,13 +197,15 @@ def execute_with_logger(meta_obj, context, logger):
         if is_coroutine_function(meta_obj.function):
 
             async def run_async():
-                async with redirect_stdout_to_logger_async(logger, logging.INFO):
-                    return await meta_obj.function(context)
+                # stdout is not formatted with colorlog and timestamp
+                # async with redirect_stdout_to_logger_async(logger, logging.INFO):
+                return await meta_obj.function(context)
 
             result = asyncio.run(run_async())
         else:
-            with redirect_stdout_to_logger(logger, logging.INFO):
-                result = meta_obj.function(context)
+            # stdout is not formatted with colorlog and timestamp
+            # with redirect_stdout_to_logger(logger, logging.INFO):
+            result = meta_obj.function(context)
     except Exception as e:
         raise e
     return result
@@ -409,10 +296,7 @@ def _regist_sql_data_requirements(resource: MorphFunctionMetaObject) -> List[str
             title=resource.title,
             variables=resource.variables,
             data_requirements=load_data,
-            output_paths=resource.output_paths,
-            output_type=resource.output_type,
             connection=resource.connection,
-            result_cache_ttl=resource.result_cache_ttl,
         )
         context.update_meta_object(filepath, meta)
 
@@ -424,6 +308,7 @@ def _run_sql(
     resource: MorphFunctionMetaObject,
     sql: str,
     logger: Optional[logging.Logger],
+    mode: Literal["api", "cli"] = "api",
 ) -> pd.DataFrame:
     """
     Execute SQL via DuckDB (if data_requirements exist) or via a configured connection.
@@ -467,10 +352,10 @@ def _run_sql(
             )
         connector = Connector(default_connection, database_connection)
 
-    if logger:
+    if logger and mode == "cli":
         logger.info("Connecting to database...")
     df = connector.execute_sql(sql)
-    if logger:
+    if logger and mode == "cli":
         logger.info("Obtained results from database.")
     return df
 
@@ -481,6 +366,7 @@ def _run_cell_with_dag(
     vars: dict[str, Any] = {},
     dag: Optional[RunDagArgs] = None,
     meta_obj_cache: Optional[MorphFunctionMetaObjectCache] = None,
+    mode: Literal["api", "cli"] = "api",
 ) -> RunCellResult:
     if dag is None:
         raise ValueError("No DAG settings provided.")
@@ -496,31 +382,21 @@ def _run_cell_with_dag(
     ext = os.path.splitext(os.path.basename(filepath))[1]
 
     try:
-        logger.info(f"Running load_data file: {filepath}, with variables: {vars}")
-        output = run_cell(
-            project,
-            cell,
-            vars,
-            logger,
-            dag,
-            meta_obj_cache,
-        )
+        if mode == "cli":
+            logger.info(f"Running load_data file: {filepath}, with variables: {vars}")
+        output = run_cell(project, cell, vars, logger, dag, meta_obj_cache, mode)
     except Exception as e:
         error_txt = (
             logging_file_error_exception(e, filepath) if ext == ".py" else str(e)
         )
         text = f"An error occurred while running the file: {error_txt}"
         logger.error(text)
-        finalize_run(
-            project,
-            cell,
-            cell.name,
-            RunStatus.FAILED.value,
-            None,
-            logger,
-            dag.run_id,
-            CliError(type="general", details=text),
-        )
+        if mode == "cli":
+            finalize_run(
+                cell,
+                None,
+                logger,
+            )
         raise Exception(text)
 
     if (
@@ -529,27 +405,19 @@ def _run_cell_with_dag(
         or is_generator(output.result)
     ):
         stream_and_write(
-            project,
             cell,
-            cell.name,
-            RunStatus.DONE.value,
-            transform_output(cell, output.result),
+            output.result,
             logger,
-            dag.run_id,
-            None,
         )
     else:
-        finalize_run(
-            project,
-            cell,
-            cell.name,
-            RunStatus.DONE.value,
-            transform_output(cell, output.result),
-            logger,
-            dag.run_id,
-            None,
-        )
-    logger.info(f"Successfully executed file: {filepath}")
+        if mode == "cli":
+            finalize_run(
+                cell,
+                output.result,
+                logger,
+            )
+    if mode == "cli":
+        logger.info(f"Successfully executed file: {filepath}")
     return output
 
 

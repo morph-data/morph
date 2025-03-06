@@ -6,8 +6,6 @@ from typing import Any, Callable, List, Literal, Optional, TypeVar
 
 from typing_extensions import ParamSpec
 
-from morph.config.project import default_output_paths
-
 from .state import MorphFunctionMetaObject, MorphGlobalContext
 
 Param = ParamSpec("Param")
@@ -29,8 +27,6 @@ def _get_morph_function_id(func: Callable) -> str:
 def func(
     name: str | None = None,
     description: str | None = None,
-    title: str | None = None,
-    result_cache_ttl: Optional[int] = None,
     alias: str | None = None,
     **kwargs: dict[str, Any],
 ) -> Callable[[Callable[Param, RetType]], Callable[Param, RetType]]:
@@ -57,13 +53,9 @@ def func(
             name=name or func.__name__,
             function=func,
             description=description,
-            title=title,
             variables=variables,
             data_requirements=data_requirements,
-            output_paths=default_output_paths(),
-            output_type=None,
             connection=connection,
-            result_cache_ttl=result_cache_ttl,
         )
         context.update_meta_object(fid, meta_obj)
 
@@ -124,10 +116,7 @@ def variables(
                         },
                     },
                     data_requirements=meta.data_requirements,
-                    output_paths=meta.output_paths,
-                    output_type=meta.output_type,
                     connection=meta.connection,
-                    result_cache_ttl=meta.result_cache_ttl,
                 ),
             )
         else:
@@ -147,10 +136,7 @@ def variables(
                         }
                     },
                     data_requirements=None,
-                    output_paths=None,
-                    output_type=None,
                     connection=None,
-                    result_cache_ttl=None,
                 ),
             )
 
@@ -182,10 +168,7 @@ def load_data(
                     title=meta.title,
                     variables=meta.variables,
                     data_requirements=meta.data_requirements + [name],
-                    output_paths=meta.output_paths,
-                    output_type=meta.output_type,
                     connection=meta.connection,
-                    result_cache_ttl=meta.result_cache_ttl,
                 ),
             )
         else:
@@ -199,10 +182,7 @@ def load_data(
                     title=None,
                     variables=None,
                     data_requirements=[name],
-                    output_paths=None,
-                    output_type=None,
                     connection=None,
-                    result_cache_ttl=None,
                 ),
             )
 
