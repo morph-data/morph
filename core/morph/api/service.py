@@ -192,10 +192,11 @@ async def run_file_stream_service(input: RunFileStreamService) -> Any:
     )
     if len(errors) > 0:
         logger.error(MorphFunctionLoadError.format_errors(errors))
+        error_details = "".join([e.error for e in errors])
         raise WarningError(
             ErrorCode.FileError,
             ErrorMessage.FileErrorMessage["notFound"],
-            f"Alias not found {input.name}. Check the console for more detailed error information.",
+            f"Alias not found {input.name}. Check the console for more detailed error information. details: {error_details}",
         )
 
     set_command_args()
