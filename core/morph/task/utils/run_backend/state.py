@@ -88,6 +88,11 @@ class MorphGlobalContext:
             cls._instance = cls()  # type: ignore
         return cls._instance  # type: ignore
 
+    @classmethod
+    def clear_instance(cls) -> None:
+        if hasattr(cls, "_instance"):
+            del cls._instance
+
     @property
     def data(self) -> dict[str, pd.DataFrame]:
         return self.__data
