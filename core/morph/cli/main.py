@@ -179,7 +179,6 @@ def serve(
     from morph.task.api import ApiTask
 
     task = ApiTask(ctx.obj["flags"])
-    print("task")
     task.run()
 
     return None, True
