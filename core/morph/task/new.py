@@ -81,8 +81,9 @@ class NewTask(BaseTask):
 
         # Ask the user to select a package manager
         package_manager_options = {
-            "1": "pip",
-            "2": "poetry",
+            "1": "poetry",
+            "2": "uv",
+            "3": "pip",
         }
         click.echo()
         click.echo("Select a package manager for your project:")
@@ -92,22 +93,22 @@ class NewTask(BaseTask):
         click.echo(
             click.style("Enter the number of your choice. (default is ["), nl=False
         )
-        click.echo(click.style("1: pip", fg="blue"), nl=False)
+        click.echo(click.style("1: poetry", fg="blue"), nl=False)
         click.echo(click.style("]): "), nl=False)
         package_manager_choice = input().strip()
 
         # Validate user input and set the package manager
         project.package_manager = package_manager_options.get(
-            package_manager_choice, "pip"
+            package_manager_choice, "poetry"
         )
         if project.package_manager not in package_manager_options.values():
             click.echo(
                 click.style(
-                    "Warning: Invalid package manager. Defaulting to 'pip'.",
+                    "Warning: Invalid package manager. Defaulting to 'poetry'.",
                     fg="yellow",
                 )
             )
-            project.package_manager = "pip"
+            project.package_manager = "poetry"
 
         save_project(self.project_root, project)
 
@@ -176,6 +177,40 @@ class NewTask(BaseTask):
 
                 # Generate the pyproject.toml content
                 pyproject_content = self._generate_pyproject_toml(
+                    project_name=os.path.basename(os.path.normpath(self.project_root)),
+                    morph_data_dependency=morph_data_dep,
+                )
+                pyproject_path = Path(self.project_root) / "pyproject.toml"
+                pyproject_path.write_text(pyproject_content, encoding="utf-8")
+
+                click.echo(
+                    click.style(
+                        "Added 'morph-data' to pyproject.toml with 'morph-data'.",
+                        fg="green",
+                    )
+                )
+            except subprocess.CalledProcessError as e:
+                click.echo(click.style(f"Poetry initialization failed: {e}", fg="red"))
+                click.echo()
+                sys.exit(1)
+        elif project.package_manager == "uv":
+            click.echo(click.style("Initializing uv...", fg="blue"))
+            try:
+                # Prepare the dependency argument
+                if self.is_development:
+                    branch = self._get_current_git_branch() or "develop"
+                    morph_data_dep = (
+                        f"git+https://github.com/morph-data/morph.git@{branch}#egg=morph-data"
+                        % branch
+                    )
+                else:
+                    if morph_data_version:
+                        morph_data_dep = f'"morph-data={morph_data_version}"'
+                    else:
+                        morph_data_dep = "morph-data"
+
+                # Generate the pyproject.toml content
+                pyproject_content = self._generate_uv_pyproject_toml(
                     project_name=os.path.basename(os.path.normpath(self.project_root)),
                     morph_data_dependency=morph_data_dep,
                 )
@@ -349,4 +384,27 @@ python = ">=3.9,<3.13"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+"""
+
+    def _generate_uv_pyproject_toml(
+        self,
+        project_name: str,
+        morph_data_dependency: str,
+    ) -> str:
+        author = self._get_git_author_info()
+        authors_line = f'authors = ["{author}"]\n' if author else ""
+
+        return f"""[project]
+name = "{project_name}"
+version = "0.1.0"
+description = ""
+{authors_line}readme = "README.md"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+    "{morph_data_dependency}"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 """
