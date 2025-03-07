@@ -50,7 +50,7 @@ class PrintResourceTask(BaseTask):
 
     def run(self):
         try:
-            cache = MorphFunctionMetaObjectCacheManager().load_cache(self.project_root)
+            cache = MorphFunctionMetaObjectCacheManager().get_cache()
         except (pydantic.ValidationError, json.decoder.JSONDecodeError):
             click.echo(
                 click.style(
@@ -122,11 +122,6 @@ class PrintResourceTask(BaseTask):
                     alias=item.spec.name,
                     path=filepath,
                     connection=(item.spec.connection if item.spec.connection else None),
-                    output_paths=(
-                        cast(list, item.spec.output_paths)
-                        if item.spec.output_paths
-                        else None
-                    ),
                     data_requirements=(
                         cast(list, item.spec.data_requirements)
                         if item.spec.data_requirements
@@ -151,11 +146,6 @@ class PrintResourceTask(BaseTask):
                         path=filepath,
                         connection=(
                             item.spec.connection if item.spec.connection else None
-                        ),
-                        output_paths=(
-                            cast(list, item.spec.output_paths)
-                            if item.spec.output_paths
-                            else None
                         ),
                         data_requirements=(
                             cast(list, item.spec.data_requirements)
@@ -183,11 +173,6 @@ class PrintResourceTask(BaseTask):
                         path=filepath,
                         connection=(
                             item.spec.connection if item.spec.connection else None
-                        ),
-                        output_paths=(
-                            cast(list, item.spec.output_paths)
-                            if item.spec.output_paths
-                            else None
                         ),
                         data_requirements=(
                             cast(list, item.spec.data_requirements)

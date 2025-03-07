@@ -1,11 +1,9 @@
 import os
 import re
 import select
-import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path
 from typing import List, Optional
 
 import click
@@ -87,8 +85,6 @@ class DeployTask(BaseTask):
 
         # Frontend and backend settings
         self.frontend_dir = initialize_frontend_dir(self.project_root)
-        self.backend_template_dir = os.path.join(Path(__file__).resolve().parents[2])
-        self.backend_dir = os.path.join(self.project_root, ".morph/core")
 
         # Docker settings
         self.image_name = f"{os.path.basename(self.project_root)}:latest"
@@ -101,9 +97,7 @@ class DeployTask(BaseTask):
 
         # Verify environment variables
         self.env_file = os.path.join(self.project_root, ".env")
-        self.should_override_env = False
-        if os.path.exists(self.env_file):
-            self.should_override_env = self._verify_environment_variables()
+        self.should_override_env = self._verify_environment_variables()
 
         # Validate API key
         self._validate_api_key()
@@ -266,6 +260,61 @@ class DeployTask(BaseTask):
                     click.style(f"Error exporting requirements.txt: {str(e)}", fg="red")
                 )
                 sys.exit(1)
+        elif self.package_manager == "uv":
+            uv_project_file = os.path.join(self.project_root, "pyproject.toml")
+            requirements_file = os.path.join(self.project_root, "requirements.txt")
+
+            missing_files = [f for f in [uv_project_file] if not os.path.exists(f)]
+            if missing_files:
+                click.echo(
+                    click.style(
+                        f"Error: Missing uv configuration files: {missing_files}",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+
+            # Check if 'morph-data' is listed in pyproject.yoml
+            with open(uv_project_file, "r") as f:
+                uv_project_content = f.read()
+            if "morph-data" not in uv_project_content:
+                click.echo(
+                    click.style(
+                        "Error: 'morph-data' is not listed in 'pyproject.toml'. Please add it.",
+                        fg="red",
+                    )
+                )
+                sys.exit(1)
+
+            # Generate requirements.txt using uv export
+            click.echo(
+                click.style(
+                    "Exporting requirements.txt from uv environment...", fg="blue"
+                )
+            )
+            try:
+                subprocess.run(
+                    [
+                        "uv",
+                        "pip",
+                        "compile",
+                        "pyproject.toml",
+                        "-o",
+                        requirements_file,
+                    ],
+                    check=True,
+                )
+                click.echo(
+                    click.style(
+                        f"'requirements.txt' generated successfully at: {requirements_file}",
+                        fg="green",
+                    )
+                )
+            except subprocess.CalledProcessError as e:
+                click.echo(
+                    click.style(f"Error exporting requirements.txt: {str(e)}", fg="red")
+                )
+                sys.exit(1)
         else:
             click.echo(
                 click.style(
@@ -276,6 +325,10 @@ class DeployTask(BaseTask):
             sys.exit(1)
 
     def _verify_environment_variables(self) -> bool:
+        # Nothing to do if .env file does not exist
+        if not os.path.exists(self.env_file):
+            return False
+
         # Check environment variables in the Morph Cloud
         try:
             env_vars_resp = self.client.list_env_vars()
@@ -294,28 +347,37 @@ class DeployTask(BaseTask):
             )
             sys.exit(1)
 
-        items = env_vars_resp.json().get("items")
-        if not items:
-            # No environment variables in the Morph Cloud
-            # In this case, there is no need to warn the user
-            return True
-
+        # Request user input to decide whether to override environment variables
+        click.echo(click.style("Detected a local .env file!", fg="yellow"))
+        click.echo(click.style("Choose how to proceed:", fg="blue"))
+        click.echo(
+            click.style("  1) Deploy without using .env (No override)", fg="blue")
+        )
         click.echo(
             click.style(
-                "Warning: .env file detected! This command will override environment variables in the Morph Cloud with local .env file.",
-                fg="yellow",
+                "  2) Use .env to override environment variables in Morph Cloud",
+                fg="blue",
             )
         )
-        if (
-            input(
-                "Are you sure you want to continue? (Y/n): ",
-            )
-            != "Y"
-        ):
-            click.echo(click.style("Aborted!"))
-            sys.exit(1)
+        choice = input("Select (1 or 2) [default: 1]: ")
 
-        return True
+        if not choice or choice == "1":
+            click.echo(click.style("Defaulting to not overriding.", fg="yellow"))
+            return False
+        elif choice == "2":
+            click.echo(
+                click.style(
+                    "Proceeding with environment variable override.", fg="green"
+                )
+            )
+            return True
+        else:
+            click.echo(
+                click.style(
+                    "Invalid choice. Defaulting to not overriding.", fg="yellow"
+                )
+            )
+            return False
 
     def _validate_api_key(self):
         res = self.client.check_api_secret()
@@ -354,14 +416,6 @@ class DeployTask(BaseTask):
 
         click.echo(click.style("Building backend...", fg="blue"))
         try:
-            # Copy the backend template
-            if os.path.exists(self.backend_dir):
-                shutil.rmtree(self.backend_dir)  # Remove existing backend directory
-            os.makedirs(self.backend_dir, exist_ok=True)
-            shutil.copytree(
-                self.backend_template_dir, self.backend_dir, dirs_exist_ok=True
-            )
-
             # Compile the morph project
             subprocess.run(
                 ["morph", "compile", "--force"], cwd=self.project_root, check=True

@@ -45,12 +45,7 @@ def parse_sys_argv():
 
 
 def start_server(port: int) -> None:
-    uvicorn.run(
-        "morph.api.app:app",
-        host="0.0.0.0",
-        port=port,
-        reload=True,
-    )
+    uvicorn.run("morph.api.app:app", host="0.0.0.0", port=port, reload=True)
 
 
 if __name__ == "__main__":

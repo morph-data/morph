@@ -3,10 +3,8 @@ import logging
 import os
 import re
 import shutil
-import time
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -66,7 +64,6 @@ class Resource(BaseModel):
     connection: Optional[str] = None
     output_paths: Optional[List[str]] = None
     public: Optional[bool] = None
-    output_type: Optional[str] = None
     data_requirements: Optional[List[str]] = None
 
     def __init__(
@@ -76,7 +73,6 @@ class Resource(BaseModel):
         connection: Optional[str] = None,
         output_paths: Optional[List[str]] = None,
         public: Optional[bool] = None,
-        output_type: Optional[str] = None,
         data_requirements: Optional[List[str]] = None,
     ):
         super().__init__(
@@ -85,7 +81,6 @@ class Resource(BaseModel):
             connection=connection,
             output_paths=output_paths,
             public=public,
-            output_type=output_type,
             data_requirements=data_requirements,
         )
 
@@ -97,55 +92,6 @@ class Resource(BaseModel):
         else:
             self.connection = None
             self.output_paths = None
-
-    def _replace_output_placeholders(
-        self,
-        run_id: str,
-        output_file: str,
-        logger: logging.Logger = logging.getLogger(),
-    ) -> List[str]:
-        # Definition of placeholder functions that can be used in the output_path
-        placeholder_map: Dict[str, str] = {
-            "{run_id}": run_id,
-            "{name}": self.alias,
-            "{now()}": datetime.now().strftime("%Y%m%d_%H%M%S"),
-            "{unix()}": str(int(time.time() * 1000)),
-        }
-
-        # Replace placeholders in the output path
-        for placeholder, expanded in placeholder_map.items():
-            if placeholder in output_file:
-                output_file = output_file.replace(placeholder, expanded)
-
-        # Replace ext() placeholder; ext() can produce multiple output_paths
-        output_files: List[str] = []
-        if "{ext()}" in output_file:
-            extensions = [".txt"]
-            if self.output_type == "visualization":
-                extensions = [".html", ".png"]
-            elif self.output_type == "dataframe":
-                extensions = [".parquet"]
-            elif self.output_type == "csv":
-                extensions = [".csv"]
-            elif self.output_type == "markdown":
-                extensions = [".md"]
-            elif self.output_type == "json":
-                extensions = [".json"]
-            output_files = [output_file.replace("{ext()}", ext) for ext in extensions]
-        else:
-            output_files = [output_file]
-
-        # Validate the output paths
-        validated_outputs = []
-        for f in output_files:
-            # Check for undefined placeholders
-            if "{" in f and "}" in f:
-                logger.warning(
-                    f"Unrecognized placeholder found in the output_paths: {f}. Cell output not saved."
-                )
-                continue
-            validated_outputs.append(f)
-        return validated_outputs
 
     @staticmethod
     def _write_output_file(
@@ -167,16 +113,13 @@ class Resource(BaseModel):
 
     def save_output_to_file(
         self,
-        run_id: str,
         output: Union[str, bytes, List[Union[str, bytes]]],
         logger: logging.Logger = logging.getLogger(),
     ) -> "Resource":
         processed_output_paths = []
 
         for original_output_path in self.output_paths or []:
-            output_files = self._replace_output_placeholders(
-                run_id, original_output_path, logger
-            )
+            output_files = [original_output_path]
             for output_file in output_files:
                 if isinstance(output, list):
                     # For multiple outputs, HTML and PNG outputs are saved as files
@@ -205,13 +148,13 @@ class Resource(BaseModel):
                         self._write_output_file(output_file, raw_output)
                         processed_output_paths.append(output_file)
                         logger.info(
-                            f"Cell output saved to: {str(Path(output_file).resolve())}"
+                            f"Output was saved to: {str(Path(output_file).resolve())}"
                         )
                 else:
                     self._write_output_file(output_file, output)
                     processed_output_paths.append(output_file)
                     logger.info(
-                        f"Cell output saved to: {str(Path(output_file).resolve())}"
+                        f"Output was saved to: {str(Path(output_file).resolve())}"
                     )
 
         self.output_paths = processed_output_paths
