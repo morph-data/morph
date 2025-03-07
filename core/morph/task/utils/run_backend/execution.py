@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import os
 import sys
@@ -419,23 +418,3 @@ def _run_cell_with_dag(
     if mode == "cli":
         logger.info(f"Successfully executed file: {filepath}")
     return output
-
-
-def generate_variables_hash(vars: Optional[dict[str, Any]]) -> Optional[str]:
-    if vars is None or len(vars) == 0:
-        return None
-
-    def make_hashable(item: Any) -> Any:
-        if isinstance(item, dict):
-            return tuple(sorted((k, make_hashable(v)) for k, v in item.items()))
-        elif isinstance(item, list):
-            return tuple(make_hashable(i) for i in item)
-        elif isinstance(item, set):
-            return frozenset(make_hashable(i) for i in item)
-        return item
-
-    hashable_vars = make_hashable(vars)
-    sorted_items = frozenset(hashable_vars)
-    sha256 = hashlib.sha256()
-    sha256.update(str(sorted_items).encode("utf-8"))
-    return sha256.hexdigest()

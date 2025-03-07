@@ -73,9 +73,6 @@ class RunTask(BaseTask):
         if self.project.project_id is not None:
             os.environ["MORPH_PROJECT_ID"] = self.project.project_id
 
-        if self.mode == "api":
-            MorphGlobalContext.clear_instance()
-
         # load .env in project root
         dotenv_path = os.path.join(self.project_root, ".env")
         load_dotenv(dotenv_path)

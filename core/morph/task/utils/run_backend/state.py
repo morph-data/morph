@@ -88,11 +88,6 @@ class MorphGlobalContext:
             cls._instance = cls()  # type: ignore
         return cls._instance  # type: ignore
 
-    @classmethod
-    def clear_instance(cls) -> None:
-        if hasattr(cls, "_instance"):
-            del cls._instance
-
     @property
     def data(self) -> dict[str, pd.DataFrame]:
         return self.__data
@@ -339,8 +334,8 @@ class MorphGlobalContext:
         else:
             current_obj.id = obj.id
             current_obj.name = obj.name
-            current_obj.function = current_obj.function or obj.function
-            current_obj.description = current_obj.description or obj.description
+            current_obj.function = obj.function or current_obj.function
+            current_obj.description = obj.description or current_obj.description
             current_obje_variables = current_obj.variables or {}
             obj_variables = obj.variables or {}
             current_obj.variables = {**current_obje_variables, **obj_variables}
@@ -350,8 +345,8 @@ class MorphGlobalContext:
                     + (obj.data_requirements or [])
                 )
             )
-            current_obj.connection = current_obj.connection or obj.connection
-            current_obj.title = current_obj.title or obj.title
+            current_obj.connection = obj.connection or current_obj.connection
+            current_obj.title = obj.title or current_obj.title
 
     def search_meta_object(self, fid: str) -> MorphFunctionMetaObject | None:
         for obj in self.__meta_objects:
