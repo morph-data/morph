@@ -31,7 +31,7 @@ class CompileTask(BaseTask):
             raise e
 
         try:
-            cache = MorphFunctionMetaObjectCacheManager().load_cache(project_root)
+            cache = MorphFunctionMetaObjectCacheManager().get_cache()
         except (pydantic.ValidationError, json.decoder.JSONDecodeError):
             click.echo(
                 click.style(
