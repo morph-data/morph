@@ -230,7 +230,10 @@ data_lock = threading.Lock()
 
 
 def _dump_and_append_chunk(chunk: Any, data: List[Dict[str, Any]]) -> Any:
-    dumped_chunk = chunk.model_dump()
+    if isinstance(chunk, MorphChatStreamChunk):
+        dumped_chunk = chunk.model_dump()
+    else:
+        dumped_chunk = {"text": str(chunk), "content": None}
     with data_lock:
         data.append(dumped_chunk)
     return dumped_chunk
