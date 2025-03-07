@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "morph-frontend dev --port",
+    "dev": "morph-frontend dev",
     "build": "morph-frontend build"
   },
   "devDependencies": {
