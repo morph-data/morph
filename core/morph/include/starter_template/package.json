@@ -4,11 +4,19 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build": "npm run build -w .morph/frontend"
+    "dev": "morph-frontend dev --port",
+    "build": "morph-frontend build"
   },
-  "dependencies": {},
-  "devDependencies": {},
-  "workspaces": [
-    ".morph/frontend"
-  ]
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "vite": "^6.2.1"
+  },
+  "dependencies": {
+    "@morph-data/components": "^0.1.9",
+    "@morph-data/frontend": "0.3.0.beta-0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-error-boundary": "^5.0.0"
+  }
 }
