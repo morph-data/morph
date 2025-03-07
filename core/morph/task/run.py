@@ -73,6 +73,13 @@ class RunTask(BaseTask):
         if self.project.project_id is not None:
             os.environ["MORPH_PROJECT_ID"] = self.project.project_id
 
+        # load .env in project root
+        dotenv_path = os.path.join(self.project_root, ".env")
+        load_dotenv(dotenv_path)
+        env_vars = dotenv_values(dotenv_path)
+        for e_key, e_val in env_vars.items():
+            os.environ[e_key] = str(e_val)
+
         context = MorphGlobalContext.get_instance()
         try:
             errors = context.partial_load(
@@ -157,13 +164,6 @@ class RunTask(BaseTask):
         self.ext = os.path.splitext(os.path.basename(self.filename))[1]
         self.cell_alias = str(self.resource.name)
         self.logger = get_morph_logger()
-
-        # load .env in project root
-        dotenv_path = os.path.join(self.project_root, ".env")
-        load_dotenv(dotenv_path)
-        env_vars = dotenv_values(dotenv_path)
-        for e_key, e_val in env_vars.items():
-            os.environ[e_key] = str(e_val)
 
     def run(self) -> Any:
         if self.ext != ".sql" and self.ext != ".py":
