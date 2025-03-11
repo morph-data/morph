@@ -154,6 +154,7 @@ def get_inertia_config():
         templates=Jinja2Templates(directory=templates_dir),
         manifest_json_path=os.path.join(project_root, "dist", "manifest.json"),
         environment="production",
+        root_directory=".",
         entrypoint_filename=".morph/frontend/main.tsx",
     )
 
