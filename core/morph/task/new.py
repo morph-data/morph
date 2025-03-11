@@ -184,6 +184,10 @@ class NewTask(BaseTask):
                 pyproject_path = Path(self.project_root) / "pyproject.toml"
                 pyproject_path.write_text(pyproject_content, encoding="utf-8")
 
+                # Run 'poetry install' to install the dependencies
+                click.echo(click.style("Running 'poetry install'...", fg="blue"))
+                subprocess.run(["poetry", "install"], cwd=self.project_root, check=True)
+
                 click.echo(
                     click.style(
                         "Added 'morph-data' to pyproject.toml with 'morph-data'.",
