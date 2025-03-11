@@ -145,8 +145,8 @@ def get_inertia_config():
             environment="development",
             use_flash_messages=True,
             use_flash_errors=True,
-            entrypoint_filename=".morph/frontend/main.tsx",
-            root_directory="",
+            entrypoint_filename="main.tsx",
+            root_directory=".morph/frontend",
             dev_url=frontend_url,
         )
 
@@ -154,8 +154,8 @@ def get_inertia_config():
         templates=Jinja2Templates(directory=templates_dir),
         manifest_json_path=os.path.join(project_root, "dist", "manifest.json"),
         environment="production",
-        root_directory="",
-        entrypoint_filename=".morph/frontend/main.tsx",
+        entrypoint_filename="main.tsx",
+        root_directory=".morph/frontend",
     )
 
 
