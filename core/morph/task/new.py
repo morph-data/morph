@@ -190,7 +190,7 @@ class NewTask(BaseTask):
 
                 click.echo(
                     click.style(
-                        "Added 'morph-data' to pyproject.toml with 'morph-data'.",
+                        "Poetry initialized with 'morph-data' as a dependency.",
                         fg="green",
                     )
                 )
@@ -222,9 +222,13 @@ class NewTask(BaseTask):
                 pyproject_path = Path(self.project_root) / "pyproject.toml"
                 pyproject_path.write_text(pyproject_content, encoding="utf-8")
 
+                # Run 'uv sync' to install dependencies
+                click.echo(click.style("Running 'uv sync'...", fg="blue"))
+                subprocess.run(["uv", "sync"], cwd=self.project_root, check=True)
+
                 click.echo(
                     click.style(
-                        "Added 'morph-data' to pyproject.toml with 'morph-data'.",
+                        "uv initialized with 'morph-data' as a dependency.",
                         fg="green",
                     )
                 )
