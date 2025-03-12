@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -13,6 +13,21 @@ from morph.task.utils.connection import (
 from morph.task.utils.morph import find_project_root_dir
 
 
+class BuildConfig(BaseModel):
+    use_custom_docker: bool = False
+    runtime: Optional[str] = None
+    framework: Optional[str] = "morph"
+    package_manager: Optional[str] = None
+    context: Optional[str] = None
+    build_args: Optional[Dict[str, str]] = None
+
+
+class DeploymentConfig(BaseModel):
+    provider: Optional[str] = "aws"
+    aws: Optional[Dict[str, Optional[str]]] = None
+    gcp: Optional[Dict[str, Optional[str]]] = None
+
+
 class MorphProject(BaseModel):
     profile: Optional[str] = "default"
     source_paths: List[str] = Field(default_factory=lambda: ["src"])
@@ -21,6 +36,8 @@ class MorphProject(BaseModel):
     package_manager: str = Field(
         default="pip", description="Package manager to use, e.g., pip or poetry."
     )
+    build: Optional[BuildConfig] = Field(default_factory=BuildConfig)
+    deployment: Optional[DeploymentConfig] = Field(default_factory=DeploymentConfig)
 
     class Config:
         arbitrary_types_allowed = True
