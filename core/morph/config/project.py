@@ -14,7 +14,7 @@ from morph.task.utils.morph import find_project_root_dir
 
 
 class BuildConfig(BaseModel):
-    use_custom_docker: bool = False
+    use_custom_dockerfile: bool = False
     runtime: Optional[str] = None
     framework: Optional[str] = "morph"
     package_manager: Optional[str] = None
