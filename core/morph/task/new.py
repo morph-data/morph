@@ -10,7 +10,12 @@ from typing import Optional
 import click
 
 from morph.cli.flags import Flags
-from morph.config.project import default_initial_project, load_project, save_project
+from morph.config.project import (
+    BuildConfig,
+    default_initial_project,
+    load_project,
+    save_project,
+)
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
 from morph.task.utils.morph import initialize_frontend_dir
@@ -110,6 +115,11 @@ class NewTask(BaseTask):
                 )
             )
             project.package_manager = "poetry"
+
+        if project.build is None:
+            project.build = BuildConfig()
+        project.build.package_manager = project.package_manager
+        project.build.runtime = self.selected_python_version
 
         save_project(self.project_root, project)
 
