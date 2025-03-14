@@ -285,7 +285,7 @@ async def file_upload_service(input: UploadFileService) -> Any:
 
         # Read the saved file path from the cache (always created as following path)
         saved_filepath = ""
-        cache_file = Path(temp_dir).joinpath("file_upload.md")
+        cache_file = Path(temp_dir).joinpath("file_upload.cache")
         if cache_file.exists():
             with open(cache_file, "r") as f:
                 saved_filepath = f.read()
