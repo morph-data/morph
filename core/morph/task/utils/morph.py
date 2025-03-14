@@ -2,13 +2,11 @@ import base64
 import logging
 import os
 import re
-import shutil
 from pathlib import Path
 from typing import List, Optional, Union
 
-from pydantic import BaseModel
-
 from morph.constants import MorphConstant
+from pydantic import BaseModel
 
 IGNORE_DIRS = ["/private/tmp", "/tmp"]
 
@@ -39,23 +37,6 @@ def find_project_root_dir(abs_filepath: Optional[str] = None) -> str:
     raise FileNotFoundError(
         "morph_project.yml not found in the current directory or any parent directories."
     )
-
-
-def initialize_frontend_dir(project_root: str) -> str:
-    """
-    Initialize the frontend directory by copying the template frontend directory to the project directory.
-    Does nothing if the frontend directory already exists.
-    @param project_root:
-    @return:
-    """
-    frontend_template_dir = os.path.join(
-        Path(__file__).resolve().parents[2], "frontend", "template"
-    )
-    frontend_dir = MorphConstant.frontend_dir(project_root)
-    if not os.path.exists(frontend_dir):
-        os.makedirs(frontend_dir, exist_ok=True)
-        shutil.copytree(frontend_template_dir, frontend_dir, dirs_exist_ok=True)
-    return frontend_dir
 
 
 class Resource(BaseModel):

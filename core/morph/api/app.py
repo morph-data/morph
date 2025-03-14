@@ -21,9 +21,6 @@ from inertia import (
     inertia_request_validation_exception_handler,
     inertia_version_conflict_exception_handler,
 )
-from starlette.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-
 from morph.api.error import ApiBaseError, InternalError, render_error_html
 from morph.api.handler import router
 from morph.api.plugin import plugin_app
@@ -32,6 +29,8 @@ from morph.task.utils.run_backend.state import (
     MorphFunctionMetaObjectCacheManager,
     MorphGlobalContext,
 )
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 # configuration values
 
@@ -42,10 +41,11 @@ logger.setLevel(logging.INFO)
 # set true to MORPH_LOCAL_DEV_MODE to use local frontend server
 is_local_dev_mode = True if os.getenv("MORPH_LOCAL_DEV_MODE") == "true" else False
 
+project_root = find_project_root_dir()
+
 
 def custom_compile_logic():
     logger.info("Compiling python and sql files...")
-    project_root = find_project_root_dir()
     context = MorphGlobalContext.get_instance()
     errors = context.load(project_root)
     if len(errors) > 0:
@@ -129,8 +129,6 @@ app.add_exception_handler(
     inertia_request_validation_exception_handler,
 )
 
-frontend_dir = os.path.join(os.getcwd(), ".morph", "frontend")
-
 
 def get_inertia_config():
     templates_dir = os.path.join(Path(__file__).resolve().parent, "templates")
@@ -148,15 +146,16 @@ def get_inertia_config():
             use_flash_messages=True,
             use_flash_errors=True,
             entrypoint_filename="main.tsx",
-            assets_prefix="/src",
+            root_directory=".morph/frontend",
             dev_url=frontend_url,
         )
 
     return InertiaConfig(
         templates=Jinja2Templates(directory=templates_dir),
-        manifest_json_path=os.path.join(frontend_dir, "dist", "manifest.json"),
+        manifest_json_path=os.path.join(project_root, "dist", "manifest.json"),
         environment="production",
         entrypoint_filename="main.tsx",
+        root_directory=".morph/frontend",
     )
 
 
@@ -167,13 +166,13 @@ InertiaDep = Annotated[Inertia, Depends(inertia_dependency_factory(inertia_confi
 if is_local_dev_mode:
     app.mount(
         "/src",
-        StaticFiles(directory=os.path.join(frontend_dir, "src")),
+        StaticFiles(directory=os.path.join(project_root, "src")),
         name="src",
     )
 else:
     app.mount(
         "/assets",
-        StaticFiles(directory=os.path.join(frontend_dir, "dist", "assets")),
+        StaticFiles(directory=os.path.join(project_root, "dist", "assets")),
         name="assets",
     )
 

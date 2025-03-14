@@ -8,15 +8,14 @@ from typing import List, Optional
 
 import click
 import requests
-from tqdm import tqdm
-
 from morph.api.cloud.client import MorphApiKeyClientImpl
 from morph.api.cloud.types import EnvVarObject
 from morph.cli.flags import Flags
 from morph.config.project import load_project
 from morph.task.base import BaseTask
 from morph.task.utils.file_upload import FileWithProgress
-from morph.task.utils.morph import find_project_root_dir, initialize_frontend_dir
+from morph.task.utils.morph import find_project_root_dir
+from tqdm import tqdm
 
 
 class DeployTask(BaseTask):
@@ -82,9 +81,6 @@ class DeployTask(BaseTask):
         except ValueError as e:
             click.echo(click.style(f"Error: {str(e)}", fg="red"))
             sys.exit(1)
-
-        # Frontend and backend settings
-        self.frontend_dir = initialize_frontend_dir(self.project_root)
 
         # Docker settings
         self.image_name = f"{os.path.basename(self.project_root)}:latest"
