@@ -8,6 +8,14 @@ COPY . .
 RUN npm install
 RUN npm run build
 
+FROM python:${MORPH_PYTHON_VERSION}-slim AS python-build
+
+WORKDIR /var/build
+
+RUN pip install poetry poetry-plugin-export
+COPY poetry.lock pyproject.toml ./
+RUN poetry export -f requirements.txt -o requirements.txt --without-hashes
+
 # Base image for Morph Cloud
 FROM public.ecr.aws/i1l4z0u0/morph-data:python${MORPH_PYTHON_VERSION}
 
@@ -15,7 +23,7 @@ FROM public.ecr.aws/i1l4z0u0/morph-data:python${MORPH_PYTHON_VERSION}
 WORKDIR /var/task
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY --from=python-build /var/build/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt --target "${MORPH_PACKAGE_ROOT}"
 
 # Copy Morph template

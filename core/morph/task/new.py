@@ -115,7 +115,13 @@ class NewTask(BaseTask):
 
         # Generate the Dockerfile template
         template_dir = Path(__file__).parents[1].joinpath("include")
-        docker_template_file = template_dir.joinpath("Dockerfile")
+        template_dockerfile_name = "Dockerfile"
+        if project.package_manager == "poetry":
+            template_dockerfile_name = "Dockerfile.poetry"
+        elif project.package_manager == "uv":
+            template_dockerfile_name = "Dockerfile.uv"
+
+        docker_template_file = template_dir.joinpath(template_dockerfile_name)
         if not docker_template_file.exists():
             click.echo(
                 click.style(
