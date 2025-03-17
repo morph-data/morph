@@ -7,7 +7,6 @@ import tempfile
 import time
 import uuid
 from contextlib import redirect_stdout
-from pathlib import Path
 from typing import Any
 
 import click
@@ -285,8 +284,8 @@ async def file_upload_service(input: UploadFileService) -> Any:
 
         # Read the saved file path from the cache (always created as following path)
         saved_filepath = ""
-        cache_file = Path(temp_dir).joinpath("file_upload.cache")
-        if cache_file.exists():
+        cache_file = "/tmp/file_upload.cache"
+        if os.path.exists(cache_file):
             with open(cache_file, "r") as f:
                 saved_filepath = f.read()
 
