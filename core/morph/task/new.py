@@ -249,6 +249,24 @@ class NewTask(BaseTask):
                 )
                 sys.exit(1)
 
+        # Setup Frontend
+        subprocess.run(
+            [
+                "npm",
+                "install",
+            ],
+            cwd=self.project_root,
+        )
+        subprocess.run(
+            [
+                "npx",
+                "shadcn@latest",
+                "add",
+                "https://morph-components.vercel.app/r/morph-components.json",
+            ],
+            cwd=self.project_root,
+        )
+
         click.echo()
         click.echo(click.style("Project setup completed successfully! 🎉", fg="green"))
         return True

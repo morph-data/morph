@@ -1,7 +1,11 @@
 {
   "extends": "@morph-data/frontend/tsconfig.app.json",
   "compilerOptions": {
-    "composite": true
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src"]
 }
