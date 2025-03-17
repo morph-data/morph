@@ -123,41 +123,6 @@ class NewTask(BaseTask):
 
         save_project(self.project_root, project)
 
-        # Generate the Dockerfile template
-        template_dir = Path(__file__).parents[1].joinpath("include")
-        docker_template_file = template_dir.joinpath("Dockerfile")
-        if not docker_template_file.exists():
-            click.echo(
-                click.style(
-                    f"Template file not found: {docker_template_file}", fg="red"
-                )
-            )
-            click.echo()
-            sys.exit(1)
-
-        # Generate the Dockerfile with the selected Python version
-        dockerfile_path = os.path.join(self.project_root, "Dockerfile")
-        try:
-            with docker_template_file.open("r", encoding="utf-8") as f:
-                dockerfile_content = f.read()
-
-            # Replace the placeholder with the selected Python version
-            dockerfile_content = dockerfile_content.replace(
-                "${MORPH_PYTHON_VERSION}", self.selected_python_version
-            )
-
-            # Write the updated Dockerfile to the project directory
-            with open(dockerfile_path, "w") as output_file:
-                output_file.write(dockerfile_content)
-        except FileNotFoundError as e:
-            click.echo(
-                click.style(f"Error: Template Dockerfile not found: {e}", fg="red")
-            )
-            sys.exit(1)
-        except IOError as e:
-            click.echo(click.style(f"Error: Unable to write Dockerfile: {e}", fg="red"))
-            sys.exit(1)
-
         try:
             morph_data_version = importlib.metadata.version("morph-data")
         except importlib.metadata.PackageNotFoundError:
