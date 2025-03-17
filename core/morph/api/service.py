@@ -284,11 +284,11 @@ async def file_upload_service(input: UploadFileService) -> Any:
         )
 
         # Read the saved file path from the cache (always created as following path)
-        cache_file = Path(find_project_root_dir()).joinpath(
-            ".morph/cache/file_upload.md"
-        )
-        with open(cache_file, "r") as f:
-            saved_filepath = f.read()
+        saved_filepath = ""
+        cache_file = Path(temp_dir).joinpath("file_upload.cache")
+        if cache_file.exists():
+            with open(cache_file, "r") as f:
+                saved_filepath = f.read()
 
         # Remove the temporary directory
         if os.path.exists(temp_dir):

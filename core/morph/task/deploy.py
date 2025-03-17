@@ -33,11 +33,11 @@ class DeployTask(BaseTask):
             sys.exit(1)
 
         # Load morph_project.yml or equivalent
-        project = load_project(self.project_root)
-        if not project:
+        self.project = load_project(self.project_root)
+        if not self.project:
             click.echo(click.style("Project configuration not found.", fg="red"))
             sys.exit(1)
-        elif project.project_id is None:
+        elif self.project.project_id is None:
             click.echo(
                 click.style(
                     "Error: No project id found. Please fill project_id in morph_project.yml.",
@@ -45,7 +45,7 @@ class DeployTask(BaseTask):
                 )
             )
             sys.exit(1)
-        self.package_manager = project.package_manager
+        self.package_manager = self.project.package_manager
 
         # Check Dockerfile existence
         self.dockerfile = os.path.join(self.project_root, "Dockerfile")
@@ -125,6 +125,7 @@ class DeployTask(BaseTask):
                 project_id=self.client.project_id,
                 image_build_log=image_build_log,
                 image_checksum=image_checksum,
+                config=self.project.model_dump() if self.project else None,
             )
         except Exception as e:
             click.echo(

@@ -9,7 +9,12 @@ from typing import Optional
 
 import click
 from morph.cli.flags import Flags
-from morph.config.project import default_initial_project, load_project, save_project
+from morph.config.project import (
+    BuildConfig,
+    default_initial_project,
+    load_project,
+    save_project,
+)
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
 from morph.task.utils.run_backend.state import MorphGlobalContext
@@ -105,42 +110,12 @@ class NewTask(BaseTask):
             )
             project.package_manager = "poetry"
 
+        if project.build is None:
+            project.build = BuildConfig()
+        project.build.package_manager = project.package_manager
+        project.build.runtime = f"python{self.selected_python_version}"
+
         save_project(self.project_root, project)
-
-        # Generate the Dockerfile template
-        template_dir = Path(__file__).parents[1].joinpath("include")
-        docker_template_file = template_dir.joinpath("Dockerfile")
-        if not docker_template_file.exists():
-            click.echo(
-                click.style(
-                    f"Template file not found: {docker_template_file}", fg="red"
-                )
-            )
-            click.echo()
-            sys.exit(1)
-
-        # Generate the Dockerfile with the selected Python version
-        dockerfile_path = os.path.join(self.project_root, "Dockerfile")
-        try:
-            with docker_template_file.open("r", encoding="utf-8") as f:
-                dockerfile_content = f.read()
-
-            # Replace the placeholder with the selected Python version
-            dockerfile_content = dockerfile_content.replace(
-                "${MORPH_PYTHON_VERSION}", self.selected_python_version
-            )
-
-            # Write the updated Dockerfile to the project directory
-            with open(dockerfile_path, "w") as output_file:
-                output_file.write(dockerfile_content)
-        except FileNotFoundError as e:
-            click.echo(
-                click.style(f"Error: Template Dockerfile not found: {e}", fg="red")
-            )
-            sys.exit(1)
-        except IOError as e:
-            click.echo(click.style(f"Error: Unable to write Dockerfile: {e}", fg="red"))
-            sys.exit(1)
 
         try:
             morph_data_version = importlib.metadata.version("morph-data")
@@ -178,9 +153,13 @@ class NewTask(BaseTask):
                 pyproject_path = Path(self.project_root) / "pyproject.toml"
                 pyproject_path.write_text(pyproject_content, encoding="utf-8")
 
+                # Run 'poetry install' to install the dependencies
+                click.echo(click.style("Running 'poetry install'...", fg="blue"))
+                subprocess.run(["poetry", "install"], cwd=self.project_root, check=True)
+
                 click.echo(
                     click.style(
-                        "Added 'morph-data' to pyproject.toml with 'morph-data'.",
+                        "Poetry initialized with 'morph-data' as a dependency.",
                         fg="green",
                     )
                 )
@@ -212,9 +191,13 @@ class NewTask(BaseTask):
                 pyproject_path = Path(self.project_root) / "pyproject.toml"
                 pyproject_path.write_text(pyproject_content, encoding="utf-8")
 
+                # Run 'uv sync' to install dependencies
+                click.echo(click.style("Running 'uv sync'...", fg="blue"))
+                subprocess.run(["uv", "sync"], cwd=self.project_root, check=True)
+
                 click.echo(
                     click.style(
-                        "Added 'morph-data' to pyproject.toml with 'morph-data'.",
+                        "uv initialized with 'morph-data' as a dependency.",
                         fg="green",
                     )
                 )
