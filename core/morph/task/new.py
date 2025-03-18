@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Optional
 
 import click
-
 from morph.cli.flags import Flags
 from morph.config.project import (
     BuildConfig,
@@ -18,7 +17,6 @@ from morph.config.project import (
 )
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
-from morph.task.utils.morph import initialize_frontend_dir
 from morph.task.utils.run_backend.state import MorphGlobalContext
 
 
@@ -37,10 +35,6 @@ class NewTask(BaseTask):
         if not os.path.exists(morph_dir):
             os.makedirs(morph_dir)
             click.echo(f"Created directory at {morph_dir}")
-
-        # Initialize the frontend directory
-        # Copy the frontend template to ~/.morph/frontend if it doesn't exist
-        initialize_frontend_dir(self.project_root)
 
         # Select the Python version for the project
         self.selected_python_version = self._select_python_version()
@@ -237,6 +231,24 @@ class NewTask(BaseTask):
                     click.style(f"Failed to create requirements.txt: {e}", fg="red")
                 )
                 sys.exit(1)
+
+        # Setup Frontend
+        subprocess.run(
+            [
+                "npm",
+                "install",
+            ],
+            cwd=self.project_root,
+        )
+        subprocess.run(
+            [
+                "npx",
+                "shadcn@latest",
+                "add",
+                "https://morph-components.vercel.app/r/morph-components.json",
+            ],
+            cwd=self.project_root,
+        )
 
         click.echo()
         click.echo(click.style("Project setup completed successfully! 🎉", fg="green"))

@@ -9,10 +9,9 @@ from typing import Any, List, Optional
 
 import click
 from dotenv import dotenv_values, load_dotenv
-
 from morph.cli.flags import Flags
 from morph.task.base import BaseTask
-from morph.task.utils.morph import find_project_root_dir, initialize_frontend_dir
+from morph.task.utils.morph import find_project_root_dir
 
 
 class ApiTask(BaseTask):
@@ -43,15 +42,10 @@ class ApiTask(BaseTask):
         for e_key, e_val in env_vars.items():
             os.environ[e_key] = str(e_val)
 
-        # Initialize the frontend directory
-        # Copy the frontend template to ~/.morph/frontend if it doesn't exist
-        self.frontend_dir = initialize_frontend_dir(self.project_root)
-
         # for managing subprocesses
         self.processes: List[subprocess.Popen[str]] = []
 
     def _find_available_port(self, start_port: int, max_port: int = 65535) -> int:
-
         port = start_port
 
         while port <= max_port:
@@ -119,7 +113,7 @@ class ApiTask(BaseTask):
         try:
             subprocess.run(
                 "npm install",
-                cwd=self.frontend_dir,
+                cwd=self.project_root,
                 shell=True,
                 check=True,
             )
@@ -130,8 +124,8 @@ class ApiTask(BaseTask):
             exit(1)
 
         self._run_process(
-            ["npm", "run", "dev", "--port", f"{self.front_port}"],
-            cwd=self.frontend_dir,
+            ["npm", "run", "dev", "--", "--port", f"{self.front_port}"],
+            cwd=self.project_root,
             is_debug=False,
         )
 

@@ -4,11 +4,23 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build": "npm run build -w .morph/frontend"
+    "dev": "morph-frontend dev",
+    "build": "morph-frontend build"
   },
-  "dependencies": {},
-  "devDependencies": {},
-  "workspaces": [
-    ".morph/frontend"
-  ]
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.14",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "vite": "^6.2.1"
+  },
+  "dependencies": {
+    "@morph-data/frontend": "0.3.0-beta.7",
+    "class-variance-authority": "^0.7.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-error-boundary": "^5.0.0",
+    "tailwind-merge": "^3.0.2",
+    "tailwindcss": "^4.0.14",
+    "tailwindcss-animate": "^1.0.7"
+  }
 }
