@@ -4,7 +4,7 @@ import {
   usePageMeta,
   MdxComponentsProvider,
   Outlet,
-  StateProvider,
+  useRefresh,
   extractComponents,
 } from "@morph-data/frontend/components";
 import "./index.css";
@@ -23,6 +23,8 @@ const morphComponents = extractComponents(
 
 export default function App() {
   const pageMeta = usePageMeta();
+
+  useRefresh();
 
   return (
     <RootErrorBoundary>
@@ -43,9 +45,7 @@ export default function App() {
           <div className="mt-4 p-2">
             <div className="grid gap-4 grid-cols-[1fr_32px] lg:grid-cols-[1fr_180px]">
               <div className="p-2">
-                <StateProvider>
-                  <Outlet />
-                </StateProvider>
+                <Outlet />
               </div>
               <div>
                 <TableOfContents
