@@ -126,7 +126,7 @@ class ApiTask(BaseTask):
         self._run_process(
             ["npm", "run", "dev", "--", "--port", f"{self.front_port}"],
             cwd=self.project_root,
-            is_debug=False,
+            is_debug=True,
         )
 
     def _run_process(
