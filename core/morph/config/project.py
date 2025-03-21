@@ -105,7 +105,7 @@ def dump_project_yaml(project: MorphProject) -> str:
     build_runtime = ""
     build_framework = ""
     build_package_manager = ""
-    build_context = "# context: ."
+    build_context = "."
     build_args_str = "\n    # - ARG_NAME=value\n    # - ANOTHER_ARG=value"
     deployment_provider = "aws"
     deployment_aws_region = "us-east-1"
@@ -121,7 +121,9 @@ def dump_project_yaml(project: MorphProject) -> str:
     # Set values if build exists
     if project.build:
         if project.build.use_custom_dockerfile is not None:
-            build_use_custom_dockerfile = str(project.build.use_custom_dockerfile)
+            build_use_custom_dockerfile = str(
+                project.build.use_custom_dockerfile
+            ).lower()
         if project.build.runtime:
             build_runtime = project.build.runtime or ""
         if project.build.framework:
@@ -129,24 +131,16 @@ def dump_project_yaml(project: MorphProject) -> str:
         if project.build.package_manager:
             build_package_manager = project.build.package_manager or ""
         if project.build.context:
-            build_context = project.build.context or "# context: ."
+            build_context = f"{project.build.context}" or "."
         if project.build.build_args:
             build_args_items = []
             for key, value in project.build.build_args.items():
                 build_args_items.append(f"{key}={value}")
             build_args_str = (
-                "\n    - ".join([""] + build_args_items)
+                "\n    # - ".join([""] + build_args_items)
                 if build_args_items
                 else "\n    # - ARG_NAME=value\n    # - ANOTHER_ARG=value"
             )
-    else:
-        # Use default BuildConfig
-        build_use_custom_dockerfile = "false"
-        build_runtime = ""
-        build_framework = ""
-        build_package_manager = ""
-        build_context = "# context: ."
-        build_args_str = "\n    # - ARG_NAME=value\n    # - ANOTHER_ARG=value"
 
     # Set values if deployment exists
     if project.deployment:
@@ -176,7 +170,7 @@ def dump_project_yaml(project: MorphProject) -> str:
     return f"""
 # Cloud Settings
 profile: {project.profile} # Defined in the Profile Section in `~/.morph/credentials`
-project_id: {project.project_id}
+project_id: {project.project_id or ""}
 
 # Framework Settings
 default_connection: {project.default_connection}
@@ -192,8 +186,8 @@ build:
     package_manager: {build_package_manager} # pip, poetry, uv
     # These settings are required when use_custom_dockerfile is true
     # They define how the Docker image will be built
-    context: {build_context if build_context != "# context: ." else "# context: ."}
-    build_args:{build_args_str}
+    # context: {build_context}
+    # build_args:{build_args_str}
 
 # Deployment Settings
 deployment:
