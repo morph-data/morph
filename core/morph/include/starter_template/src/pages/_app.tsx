@@ -1,5 +1,6 @@
 import { Head } from "@morph-data/frontend/components";
-import { RootErrorBoundary, Header, TableOfContents } from "./_morph-data-lib";
+import { TableOfContents } from "./_components/table-of-contents";
+import { Header } from "./_components/header";
 import {
   usePageMeta,
   MdxComponentsProvider,
@@ -27,7 +28,7 @@ export default function App() {
   useRefresh();
 
   return (
-    <RootErrorBoundary>
+    <>
       <Head key={pageMeta?.pathname}>
         <title>{pageMeta?.title}</title>
         <link head-key="favicon" rel="icon" href="/static/favicon.ico" />
@@ -57,6 +58,6 @@ export default function App() {
           </div>
         </div>
       </MdxComponentsProvider>
-    </RootErrorBoundary>
+    </>
   );
 }
