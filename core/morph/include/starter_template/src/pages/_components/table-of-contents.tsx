@@ -23,13 +23,7 @@ export const TableOfContents: React.FC<TocProps> = ({ toc, className }) => {
       <div className={cn("toc text-sm w-full hidden lg:block", className)}>
         <div className="grid gird-cols-1 gap-2.5 w-full">
           {toc.map((entry) => (
-            <a
-              key={entry.id}
-              className="x-underline text-zinc-400 hover:text-zinc-900 font-normal line-clamp-2"
-              href={`#${entry.id}`}
-            >
-              {entry.value}
-            </a>
+            <Heading key={entry.id} entry={entry} />
           ))}
         </div>
       </div>
@@ -43,18 +37,28 @@ export const TableOfContents: React.FC<TocProps> = ({ toc, className }) => {
           <HoverCardContent className="w-[16rem]">
             <div className="grid gird-cols-1 gap-2.5 w-full">
               {toc.map((entry) => (
-                <a
-                  key={entry.id}
-                  className="x-underline text-zinc-400 hover:text-zinc-900 font-normal line-clamp-2"
-                  href={`#${entry.id}`}
-                >
-                  {entry.value}
-                </a>
+                <Heading key={entry.id} entry={entry} />
               ))}
             </div>
           </HoverCardContent>
         </HoverCard>
       </div>
+    </>
+  );
+};
+
+const Heading = ({ entry }: { entry: Toc[number] }) => {
+  return (
+    <>
+      <a
+        href={`#${entry.id}`}
+        className="inline-block x-underline text-zinc-400 hover:text-zinc-900 font-normal line-clamp-2"
+      >
+        {entry.value}
+      </a>
+      {entry.children?.map((child) => (
+        <Heading entry={child} />
+      ))}
     </>
   );
 };
