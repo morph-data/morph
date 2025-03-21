@@ -245,6 +245,7 @@ class NewTask(BaseTask):
                 "npx",
                 "shadcn@latest",
                 "add",
+                "--yes",
                 "https://morph-components.vercel.app/r/morph-components.json",
             ],
             cwd=self.project_root,
