@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "morph-data"
-version = "0.2.1"
+version = "0.3.0rc1"
 description = "Morph is a python-centric full-stack framework for building and deploying data apps."
 authors = ["Morph <contact@morphdb.io>"]
 packages = [
