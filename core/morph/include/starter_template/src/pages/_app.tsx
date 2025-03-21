@@ -8,6 +8,9 @@ import {
   useRefresh,
   extractComponents,
 } from "@morph-data/frontend/components";
+import { ErrorBoundary } from "react-error-boundary";
+import { Callout } from "@/pages/_components/ui/callout";
+
 import "./index.css";
 
 const uiComponents = extractComponents(
@@ -46,7 +49,17 @@ export default function App() {
           <div className="mt-4 p-2">
             <div className="grid gap-4 grid-cols-[1fr_32px] lg:grid-cols-[1fr_180px]">
               <div className="p-2">
-                <Outlet />
+                <ErrorBoundary
+                  fallbackRender={({ error }) => (
+                    <Callout variant="error" title="Error">
+                      {typeof error.message === "string"
+                        ? error.message
+                        : "Something went wrong"}
+                    </Callout>
+                  )}
+                >
+                  <Outlet />
+                </ErrorBoundary>
               </div>
               <div>
                 <TableOfContents
@@ -61,3 +74,9 @@ export default function App() {
     </>
   );
 }
+
+export const Catch = () => (
+  <Callout variant="error" title="Error">
+    Something went wrong
+  </Callout>
+);
