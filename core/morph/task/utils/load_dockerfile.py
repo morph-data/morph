@@ -4,7 +4,8 @@ import requests
 
 
 def get_dockerfile_from_api(
-    framework: Optional[str] = "morph",
+    framework: str,
+    provider: str,
     package_manager: Optional[str] = None,
     runtime: Optional[str] = None,
 ) -> Tuple[str, str]:
@@ -13,15 +14,18 @@ def get_dockerfile_from_api(
 
     Args:
         framework: The framework to get the dockerfile for
+        provider: The provider to get the dockerfile for
         package_manager: Optional package manager to use
-        language_version: Optional language version to use
+        runtime: Optional runtime to use
 
     Returns:
         Tuple containing (dockerfile, dockerignore)
     """
     url = f"https://backend-api-public.morph-cb9.workers.dev/dockerfile/{framework}"
 
-    params: Dict[str, Any] = {}
+    params: Dict[str, Any] = {
+        "provider": provider,
+    }
     if package_manager:
         params["packageManager"] = package_manager
     if runtime:
