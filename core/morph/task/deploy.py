@@ -56,11 +56,20 @@ class DeployTask(BaseTask):
                 click.echo(click.style(f"Error: {self.dockerfile} not found", fg="red"))
                 sys.exit(1)
         else:
+            provider = "aws"
+            if (
+                self.project.deployment is not None
+                and self.project.deployment.provider is not None
+            ):
+                provider = self.project.deployment.provider or "aws"
             if self.project.build is None:
-                dockerfile, dockerignore = get_dockerfile_from_api("morph", None, None)
+                dockerfile, dockerignore = get_dockerfile_from_api(
+                    "morph", provider, None, None
+                )
             else:
                 dockerfile, dockerignore = get_dockerfile_from_api(
-                    self.project.build.framework,
+                    self.project.build.framework or "morph",
+                    provider,
                     self.project.build.package_manager,
                     self.project.build.runtime,
                 )

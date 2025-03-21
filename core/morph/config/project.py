@@ -170,7 +170,7 @@ def dump_project_yaml(project: MorphProject) -> str:
     return f"""
 # Cloud Settings
 profile: {project.profile} # Defined in the Profile Section in `~/.morph/credentials`
-project_id: {project.project_id or ""}
+project_id: {project.project_id or "null"}
 
 # Framework Settings
 default_connection: {project.default_connection}
