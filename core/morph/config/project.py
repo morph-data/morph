@@ -162,13 +162,15 @@ def dump_project_yaml(project: MorphProject) -> str:
         deployment_provider = "aws"
 
     return f"""
-# Cloud Settings
-profile: {project.profile} # Defined in the Profile Section in `~/.morph/credentials`
-project_id: {project.project_id or "null"}
+version: 1
 
 # Framework Settings
 default_connection: {project.default_connection}
 source_paths:{source_paths}
+
+# Cloud Settings
+# profile: {project.profile} # Defined in the Profile Section in `~/.morph/credentials`
+# project_id: {project.project_id or "null"}
 
 # Build Settings
 build:
