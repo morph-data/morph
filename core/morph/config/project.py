@@ -14,7 +14,6 @@ from morph.task.utils.morph import find_project_root_dir
 
 
 class BuildConfig(BaseModel):
-    use_custom_dockerfile: bool = False
     runtime: Optional[str] = None
     framework: Optional[str] = "morph"
     package_manager: Optional[str] = None
@@ -101,7 +100,6 @@ def dump_project_yaml(project: MorphProject) -> str:
     source_paths = "\n- ".join([""] + project.source_paths)
 
     # Default values
-    build_use_custom_dockerfile = "false"
     build_runtime = ""
     build_framework = ""
     build_package_manager = ""
@@ -120,10 +118,6 @@ def dump_project_yaml(project: MorphProject) -> str:
 
     # Set values if build exists
     if project.build:
-        if project.build.use_custom_dockerfile is not None:
-            build_use_custom_dockerfile = str(
-                project.build.use_custom_dockerfile
-            ).lower()
         if project.build.runtime:
             build_runtime = project.build.runtime or ""
         if project.build.framework:
@@ -168,23 +162,24 @@ def dump_project_yaml(project: MorphProject) -> str:
         deployment_provider = "aws"
 
     return f"""
-# Cloud Settings
-profile: {project.profile} # Defined in the Profile Section in `~/.morph/credentials`
-project_id: {project.project_id or "null"}
+version: '1'
 
 # Framework Settings
 default_connection: {project.default_connection}
 source_paths:{source_paths}
 
+# Cloud Settings
+# profile: {project.profile} # Defined in the Profile Section in `~/.morph/credentials`
+# project_id: {project.project_id or "null"}
+
 # Build Settings
 build:
-    use_custom_dockerfile: {build_use_custom_dockerfile}
-    # These settings are required when use_custom_dockerfile is false
+    # These settings are required when there is no Dockerfile in the project root.
     # They define the environment in which the project will be built
     runtime: {build_runtime} # python3.9, python3.10, python3.11, python3.12
     framework: {build_framework}
     package_manager: {build_package_manager} # pip, poetry, uv
-    # These settings are required when use_custom_dockerfile is true
+    # These settings are required when there is a Dockerfile in the project root.
     # They define how the Docker image will be built
     # context: {build_context}
     # build_args:{build_args_str}
