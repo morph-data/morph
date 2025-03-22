@@ -50,12 +50,9 @@ class DeployTask(BaseTask):
         self.package_manager = self.project.package_manager
 
         # Check Dockerfile existence
-        self.dockerfile = os.path.join(self.project_root, "Dockerfile")
-        if self.project.build is not None and self.project.build.use_custom_dockerfile:
-            if not os.path.exists(self.dockerfile):
-                click.echo(click.style(f"Error: {self.dockerfile} not found", fg="red"))
-                sys.exit(1)
-        else:
+        self.dockerfile_path = os.path.join(self.project_root, "Dockerfile")
+        self.use_custom_dockerfile = os.path.exists(self.dockerfile_path)
+        if self.use_custom_dockerfile:
             provider = "aws"
             if (
                 self.project.deployment is not None
@@ -73,7 +70,7 @@ class DeployTask(BaseTask):
                     self.project.build.package_manager,
                     self.project.build.runtime,
                 )
-            with open(self.dockerfile, "w") as f:
+            with open(self.dockerfile_path, "w") as f:
                 f.write(dockerfile)
             dockerignore_path = os.path.join(self.project_root, ".dockerignore")
             with open(dockerignore_path, "w") as f:
@@ -440,7 +437,7 @@ class DeployTask(BaseTask):
             "-t",
             self.image_name,
             "-f",
-            self.dockerfile,
+            self.dockerfile_path,
             self.project_root,
         ]
         if self.no_cache:
