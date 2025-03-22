@@ -162,7 +162,7 @@ def dump_project_yaml(project: MorphProject) -> str:
         deployment_provider = "aws"
 
     return f"""
-version: 1
+version: '1'
 
 # Framework Settings
 default_connection: {project.default_connection}
