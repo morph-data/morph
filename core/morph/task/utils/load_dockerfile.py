@@ -21,7 +21,7 @@ def get_dockerfile_from_api(
     Returns:
         Tuple containing (dockerfile, dockerignore)
     """
-    url = f"https://backend-api-public.morph-cb9.workers.dev/dockerfile/{framework}"
+    url = f"https://dockerfile-template.morph-cb9.workers.dev/dockerfile/{framework}"
 
     params: Dict[str, Any] = {
         "provider": provider,
