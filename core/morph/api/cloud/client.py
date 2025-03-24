@@ -132,14 +132,20 @@ class MorphApiKeyClientImpl(MorphApiBaseClient):
 
     @validate_project_id
     def initiate_deployment(
-        self, project_id: str, image_build_log: str, image_checksum: str
+        self,
+        project_id: str,
+        image_build_log: str,
+        image_checksum: str,
+        config: Optional[dict[str, Any]] = None,
     ) -> MorphClientResponse:
         path = "deployment"
-        body = {
+        body: dict[str, Any] = {
             "projectId": project_id,
             "imageBuildLog": image_build_log,
             "imageChecksum": image_checksum,
         }
+        if config:
+            body["config"] = config
 
         return self.request(method="POST", path=path, data=body)
 

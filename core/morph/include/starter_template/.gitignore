@@ -1,6 +1,9 @@
 # Morph config files and directories
 .morph
 
+# Morph build output
+dist
+
 # Node.js
 node_modules
 

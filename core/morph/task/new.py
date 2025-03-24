@@ -8,12 +8,15 @@ from pathlib import Path
 from typing import Optional
 
 import click
-
 from morph.cli.flags import Flags
-from morph.config.project import default_initial_project, load_project, save_project
+from morph.config.project import (
+    BuildConfig,
+    default_initial_project,
+    load_project,
+    save_project,
+)
 from morph.constants import MorphConstant
 from morph.task.base import BaseTask
-from morph.task.utils.morph import initialize_frontend_dir
 from morph.task.utils.run_backend.state import MorphGlobalContext
 
 
@@ -32,10 +35,6 @@ class NewTask(BaseTask):
         if not os.path.exists(morph_dir):
             os.makedirs(morph_dir)
             click.echo(f"Created directory at {morph_dir}")
-
-        # Initialize the frontend directory
-        # Copy the frontend template to ~/.morph/frontend if it doesn't exist
-        initialize_frontend_dir(self.project_root)
 
         # Select the Python version for the project
         self.selected_python_version = self._select_python_version()
@@ -111,42 +110,12 @@ class NewTask(BaseTask):
             )
             project.package_manager = "poetry"
 
+        if project.build is None:
+            project.build = BuildConfig()
+        project.build.package_manager = project.package_manager
+        project.build.runtime = f"python{self.selected_python_version}"
+
         save_project(self.project_root, project)
-
-        # Generate the Dockerfile template
-        template_dir = Path(__file__).parents[1].joinpath("include")
-        docker_template_file = template_dir.joinpath("Dockerfile")
-        if not docker_template_file.exists():
-            click.echo(
-                click.style(
-                    f"Template file not found: {docker_template_file}", fg="red"
-                )
-            )
-            click.echo()
-            sys.exit(1)
-
-        # Generate the Dockerfile with the selected Python version
-        dockerfile_path = os.path.join(self.project_root, "Dockerfile")
-        try:
-            with docker_template_file.open("r", encoding="utf-8") as f:
-                dockerfile_content = f.read()
-
-            # Replace the placeholder with the selected Python version
-            dockerfile_content = dockerfile_content.replace(
-                "${MORPH_PYTHON_VERSION}", self.selected_python_version
-            )
-
-            # Write the updated Dockerfile to the project directory
-            with open(dockerfile_path, "w") as output_file:
-                output_file.write(dockerfile_content)
-        except FileNotFoundError as e:
-            click.echo(
-                click.style(f"Error: Template Dockerfile not found: {e}", fg="red")
-            )
-            sys.exit(1)
-        except IOError as e:
-            click.echo(click.style(f"Error: Unable to write Dockerfile: {e}", fg="red"))
-            sys.exit(1)
 
         try:
             morph_data_version = importlib.metadata.version("morph-data")
@@ -262,6 +231,25 @@ class NewTask(BaseTask):
                     click.style(f"Failed to create requirements.txt: {e}", fg="red")
                 )
                 sys.exit(1)
+
+        # Setup Frontend
+        subprocess.run(
+            [
+                "npm",
+                "install",
+            ],
+            cwd=self.project_root,
+        )
+        subprocess.run(
+            [
+                "npx",
+                "shadcn@latest",
+                "add",
+                "--yes",
+                "https://morph-components.vercel.app/r/morph-components.json",
+            ],
+            cwd=self.project_root,
+        )
 
         click.echo()
         click.echo(click.style("Project setup completed successfully! 🎉", fg="green"))
