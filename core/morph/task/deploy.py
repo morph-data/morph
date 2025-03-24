@@ -8,14 +8,16 @@ from typing import List, Optional
 
 import click
 import requests
+from tqdm import tqdm
+
 from morph.api.cloud.client import MorphApiKeyClientImpl
 from morph.api.cloud.types import EnvVarObject
 from morph.cli.flags import Flags
 from morph.config.project import load_project
 from morph.task.base import BaseTask
 from morph.task.utils.file_upload import FileWithProgress
+from morph.task.utils.load_dockerfile import get_dockerfile_from_api
 from morph.task.utils.morph import find_project_root_dir
-from tqdm import tqdm
 
 
 class DeployTask(BaseTask):
@@ -48,10 +50,31 @@ class DeployTask(BaseTask):
         self.package_manager = self.project.package_manager
 
         # Check Dockerfile existence
-        self.dockerfile = os.path.join(self.project_root, "Dockerfile")
-        if not os.path.exists(self.dockerfile):
-            click.echo(click.style(f"Error: {self.dockerfile} not found", fg="red"))
-            sys.exit(1)
+        self.dockerfile_path = os.path.join(self.project_root, "Dockerfile")
+        self.use_custom_dockerfile = os.path.exists(self.dockerfile_path)
+        if self.use_custom_dockerfile:
+            provider = "aws"
+            if (
+                self.project.deployment is not None
+                and self.project.deployment.provider is not None
+            ):
+                provider = self.project.deployment.provider or "aws"
+            if self.project.build is None:
+                dockerfile, dockerignore = get_dockerfile_from_api(
+                    "morph", provider, None, None
+                )
+            else:
+                dockerfile, dockerignore = get_dockerfile_from_api(
+                    self.project.build.framework or "morph",
+                    provider,
+                    self.project.build.package_manager,
+                    self.project.build.runtime,
+                )
+            with open(self.dockerfile_path, "w") as f:
+                f.write(dockerfile)
+            dockerignore_path = os.path.join(self.project_root, ".dockerignore")
+            with open(dockerignore_path, "w") as f:
+                f.write(dockerignore)
 
         # Check Docker availability
         try:
@@ -105,7 +128,7 @@ class DeployTask(BaseTask):
         click.echo(click.style("Initiating deployment sequence...", fg="blue"))
 
         # 1. Build the source code
-        self._copy_and_build_source()
+        self._build_source()
 
         # 2. Build the Docker image
         click.echo(click.style("Building Docker image...", fg="blue"))
@@ -387,31 +410,8 @@ class DeployTask(BaseTask):
             )
             sys.exit(1)
 
-    def _copy_and_build_source(self):
-        click.echo(click.style("Building frontend...", fg="blue"))
-        try:
-            # Run npm install and build
-            subprocess.run(
-                ["npm", "install"],
-                cwd=self.project_root,
-                check=True,
-                shell=True if sys.platform == "win32" else False,
-            )
-            subprocess.run(
-                ["npm", "run", "build"],
-                cwd=self.project_root,
-                check=True,
-                shell=True if sys.platform == "win32" else False,
-            )
-
-        except subprocess.CalledProcessError as e:
-            click.echo(click.style(f"Error building frontend: {str(e)}", fg="red"))
-            sys.exit(1)
-        except Exception as e:
-            click.echo(click.style(f"Unexpected error: {str(e)}", fg="red"))
-            sys.exit(1)
-
-        click.echo(click.style("Building backend...", fg="blue"))
+    def _build_source(self):
+        click.echo(click.style("Compiling morph project...", fg="blue"))
         try:
             # Compile the morph project
             subprocess.run(
@@ -437,7 +437,7 @@ class DeployTask(BaseTask):
             "-t",
             self.image_name,
             "-f",
-            self.dockerfile,
+            self.dockerfile_path,
             self.project_root,
         ]
         if self.no_cache:
