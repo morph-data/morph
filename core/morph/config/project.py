@@ -110,7 +110,7 @@ def dump_project_yaml(project: MorphProject) -> str:
     deployment_aws_memory = "1024"
     deployment_aws_timeout = "300"
     deployment_aws_concurrency = "1"
-    deployment_aws_ephemeral_storage = "512Mi"
+    deployment_aws_ephemeral_storage = "512"
     deployment_aws_provisioned_concurrency = "0"
     deployment_gcp_region = "us-central1"
     deployment_gcp_memory = "1Gi"
