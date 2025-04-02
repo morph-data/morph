@@ -110,11 +110,15 @@ def dump_project_yaml(project: MorphProject) -> str:
     deployment_aws_memory = "1024"
     deployment_aws_timeout = "300"
     deployment_aws_concurrency = "1"
+    deployment_aws_ephemeral_storage = "512Mi"
+    deployment_aws_provisioned_concurrency = "0"
     deployment_gcp_region = "us-central1"
     deployment_gcp_memory = "1Gi"
     deployment_gcp_cpu = "1"
     deployment_gcp_concurrency = "80"
     deployment_gcp_timeout = "300"
+    deployment_gcp_min_instances = "0"
+    deployment_gcp_ephemeral_storage = "100Mi"
 
     # Set values if build exists
     if project.build:
@@ -193,10 +197,14 @@ deployment:
     #     memory: {deployment_aws_memory}
     #     timeout: {deployment_aws_timeout}
     #     concurrency: {deployment_aws_concurrency}
+    #     ephemeral_storage: {deployment_aws_ephemeral_storage}
+    #     provisioned_concurrency: {deployment_aws_provisioned_concurrency}
     # gcp:
     #     region: {deployment_gcp_region}
     #     memory: {deployment_gcp_memory}
     #     cpu: {deployment_gcp_cpu}
     #     concurrency: {deployment_gcp_concurrency}
     #     timeout: {deployment_gcp_timeout}
+    #     min_instances: {deployment_gcp_min_instances}
+    #     ephemeral_storage: {deployment_gcp_ephemeral_storage}
 """
