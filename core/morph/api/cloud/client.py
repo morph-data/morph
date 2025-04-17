@@ -8,7 +8,7 @@ from morph.api.cloud.types import EnvVarObject
 from morph.constants import MorphConstant
 from morph.task.utils.morph import find_project_root_dir
 
-MORPH_API_BASE_URL = "https://api.morph-data.io/v0"
+MORPH_API_BASE_URL = "https://api.squadbase.dev/v0"
 
 
 def validate_project_id(method):
