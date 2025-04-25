@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -23,8 +23,8 @@ class BuildConfig(BaseModel):
 
 class DeploymentConfig(BaseModel):
     provider: Optional[str] = "aws"
-    aws: Optional[Dict[str, Optional[str]]] = None
-    gcp: Optional[Dict[str, Optional[str]]] = None
+    aws: Optional[Dict[str, Any]] = None
+    gcp: Optional[Dict[str, Any]] = None
 
 
 class MorphProject(BaseModel):
